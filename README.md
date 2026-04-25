@@ -43,16 +43,18 @@ financial_intelligence/
 │       ├── upload.py            # POST /upload  POST /update
 │       └── dashboard.py         # GET /dashboard
 ├── frontend/
-│   ├── app.py                   # Streamlit main app
-│   └── components/
-│       ├── overview.py
-│       ├── monthly_trends.py
-│       ├── yearly_trends.py
-│       ├── category_breakdown.py
-│       ├── tag_analysis.py
-│       ├── anomalies.py
-│       ├── savings.py
-│       └── comparison.py
+│   ├── streamlit_app.py         # Entry point — page config, CSS, session state, tab routing
+│   ├── config.py                # Colors, chart palette, API URL, category classification map
+│   ├── formatters.py            # fmt_inr(), fmt_month(), fmt_delta(), fmt_pct()
+│   ├── api.py                   # Cached API fetch functions (api_dashboard, api_months, etc.)
+│   ├── analytics.py             # Client-side compute: baselines, behavioral split, trend aggregation
+│   ├── charts.py                # Plotly chart factories (make_overview_bar, make_donut, etc.)
+│   └── tabs/
+│       ├── overview.py          # Overview tab renderer
+│       ├── compare.py           # Compare tab renderer
+│       ├── trends.py            # Trends tab renderer
+│       ├── alerts.py            # Alerts tab renderer
+│       └── data.py              # Data upload tab renderer
 ├── data/
 │   └── sample_data.csv          # 12-month sample dataset
 ├── requirements.txt
@@ -82,11 +84,10 @@ The SQLite database (`financial_intelligence.db`) is created automatically on fi
 
 ### 3. Start the Streamlit frontend
 
-In a separate terminal:
+In a separate terminal (run from the **project root**):
 
 ```bash
-cd frontend
-streamlit run app.py
+streamlit run frontend/streamlit_app.py
 ```
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.
@@ -144,6 +145,38 @@ Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
+## Frontend Architecture
+
+The frontend is a modular Streamlit package under `frontend/`:
+
+| File | Responsibility |
+|------|---------------|
+| `streamlit_app.py` | Entry point — page config, CSS, session state, tab routing |
+| `config.py` | Colors, chart palette, API URL, category classification map |
+| `formatters.py` | `fmt_inr()`, `fmt_month()`, `fmt_delta()`, `fmt_pct()` |
+| `api.py` | Cached API fetch functions (`api_dashboard`, `api_months`, etc.) |
+| `analytics.py` | Client-side compute: baselines, behavioral split, takeaways, trend aggregation |
+| `charts.py` | Plotly chart factories (`make_overview_bar`, `make_donut`, `make_category_bar`) |
+| `tabs/overview.py` | Overview tab renderer |
+| `tabs/compare.py` | Compare tab renderer |
+| `tabs/trends.py` | Trends tab renderer (granularity aggregation happens here) |
+| `tabs/alerts.py` | Alerts tab renderer |
+| `tabs/data.py` | Data upload tab renderer |
+
+### Adding a new category classification
+
+Edit `frontend/config.py` → `CATEGORY_CLASSIFICATION` dict.
+Add your category name mapped to `"essential"` or `"discretionary"`.
+The change takes effect immediately on next page load — no backend restart needed.
+
+### Changing the default baseline window
+
+Edit `DEFAULTS["compare_baseline"]` in `frontend/streamlit_app.py`.
+Available options: `"last_month"`, `"recent_avg"` (3m), `"longterm_avg"` (6m),
+`"12m_avg"` (12m), `"all_time"`.
+
+---
+
 ## Analytics Coverage
 
 | Feature | Description |
@@ -160,16 +193,6 @@ Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 | Spending Behavior | Top 5 categories, top-3 concentration %, essential vs discretionary |
 | Budget Baseline | Median of last 3 months per category |
 | Savings Opportunities | Categories above their 3-month median |
-
----
-
-## Category Tagging Rules
-
-**Essential:** Rent, Utilities, Groceries, Insurance, Medical, Healthcare, Electricity, Water, Gas, Internet, Mobile, Transport, Commute
-
-**Discretionary:** Food Delivery, Dining Out, Entertainment, Shopping, Travel, Subscriptions, Personal Care, Fitness, Clothing, Accessories, Gadgets, Gifts
-
-**Uncategorized:** Everything else
 
 ---
 

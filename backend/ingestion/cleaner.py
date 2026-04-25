@@ -37,9 +37,17 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         df.get("Subcategory", pd.Series(dtype=str)).notna(), other=None
     )
 
-    # Handle description: use Note / Description if exists, otherwise empty
-    if "Note / Description" in df.columns:
-        df["description"] = df["Note / Description"].fillna("").astype(str).str.strip()
+    # Preserve description: try all plausible column names in priority order.
+    # The column_mapper may rename the source column, so check both the standard
+    # name and common raw names from user CSVs (narration, remarks, particulars…).
+    _desc_candidates = [
+        "Note / Description", "description", "narration", "note",
+        "memo", "remarks", "particulars", "details",
+        "transaction description", "transaction narration",
+    ]
+    _desc_col = next((c for c in _desc_candidates if c in df.columns), None)
+    if _desc_col:
+        df["description"] = df[_desc_col].fillna("").astype(str).str.strip()
     else:
         df["description"] = ""
 

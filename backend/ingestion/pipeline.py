@@ -1,11 +1,11 @@
 import pandas as pd
 from sqlalchemy.orm import Session
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from ingestion.column_mapper import normalize_column_names
 from ingestion.validator import validate
 from ingestion.cleaner import clean
 from ingestion.tagger import tag_dataframe
+from ingestion.exception import apply_exceptions
 from models import Transaction
 
 
@@ -19,10 +19,13 @@ def run_pipeline(df: pd.DataFrame, db: Session) -> dict:
     # Step 2: Clean
     df = clean(df)
 
-    # Step 3: Tag
+    # Step 3: Tag essential / discretionary
     df = tag_dataframe(df)
 
-    # Step 4: Insert with idempotency
+    # Step 4: Apply exceptions (e.g. card settlement reclassification)
+    df = apply_exceptions(df)
+
+    # Step 5: Insert with idempotency
     inserted = 0
     skipped = 0
     affected_months: set[str] = set()
