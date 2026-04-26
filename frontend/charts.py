@@ -56,19 +56,45 @@ def make_overview_bar(
         recent = monthly_data[-12:]
     months_raw = [m["month"] for m in recent]
     months_fmt = fmt_month_axis(months_raw)
+    n = len(recent)
 
-    # Build per-account expense arrays if account data available
-    bank_exp = [0.0] * len(recent)
-    card_exp = [0.0] * len(recent)
-    has_acct = False
+    # Default arrays from pre-computed monthly aggregates
+    income_arr = [m["total_income"]     for m in recent]
+    invest_arr = [m["total_investment"] for m in recent]
+    saving_arr = [m["net_savings"]      for m in recent]
+    bank_exp   = [0.0] * n
+    card_exp   = [0.0] * n
+    has_acct   = False
+
     if account_monthly:
         by_key = {(r["month"], r["account_type"]): r for r in account_monthly}
+
+        # Sum income and investment across all account types per month so every
+        # bar in the chart is derived from the same Transaction-level source.
+        month_income: dict[str, float] = {}
+        month_invest: dict[str, float] = {}
+        for r in account_monthly:
+            mo = r["month"]
+            month_income[mo] = month_income.get(mo, 0.0) + r.get("income", 0.0)
+            month_invest[mo] = month_invest.get(mo, 0.0) + r.get("investment", 0.0)
+
         for i, m in enumerate(recent):
-            b = by_key.get((m["month"], "Bank"))
-            c = by_key.get((m["month"], "Card"))
-            bank_exp[i] = b["expense"] if b else 0.0
-            card_exp[i] = c["expense"] if c else 0.0
-        has_acct = any(v > 0 for v in card_exp)  # only split if card data exists
+            mo = m["month"]
+            b = by_key.get((mo, "Bank"))
+            c = by_key.get((mo, "Card"))
+            bank_exp[i]   = b["expense"] if b else 0.0
+            card_exp[i]   = c["expense"] if c else 0.0
+            income_arr[i] = month_income.get(mo, income_arr[i])
+            invest_arr[i] = month_invest.get(mo, invest_arr[i])
+
+        has_acct = any(v > 0 for v in card_exp)
+
+        # Derive savings from the values actually plotted so bars are internally
+        # consistent: Savings = Income − Expense − Investment.
+        saving_arr = [
+            income_arr[i] - (bank_exp[i] + card_exp[i]) - invest_arr[i]
+            for i in range(n)
+        ]
 
     fig = go.Figure()
 
@@ -76,7 +102,7 @@ def make_overview_bar(
     fig.add_trace(go.Bar(
         name="Income",
         x=months_fmt,
-        y=[m["total_income"] for m in recent],
+        y=income_arr,
         marker_color=COLORS["green"],
         marker_line_width=0,
         offsetgroup=0,
@@ -105,10 +131,16 @@ def make_overview_bar(
             hovertemplate="<b>%{x}</b><br>Card Expense: ₹%{y:,.0f}<extra></extra>",
         ))
     else:
+        # No card data: expense = sum of bank-only account data (or fall back to aggregate)
+        exp_vals = (
+            [bank_exp[i] + card_exp[i] for i in range(n)]
+            if account_monthly
+            else [m["total_expense"] for m in recent]
+        )
         fig.add_trace(go.Bar(
             name="Expenses",
             x=months_fmt,
-            y=[m["total_expense"] for m in recent],
+            y=exp_vals,
             marker_color=COLORS["red"],
             marker_line_width=0,
             offsetgroup=1,
@@ -119,18 +151,18 @@ def make_overview_bar(
     fig.add_trace(go.Bar(
         name="Investment",
         x=months_fmt,
-        y=[m["total_investment"] for m in recent],
+        y=invest_arr,
         marker_color=COLORS["blue"],
         marker_line_width=0,
         offsetgroup=2,
         hovertemplate="<b>%{x}</b><br>Investment: ₹%{y:,.0f}<extra></extra>",
     ))
 
-    # Group 3 — Net Savings
+    # Group 3 — Net Savings  (= Income − Expense − Investment)
     fig.add_trace(go.Bar(
         name="Net Savings",
         x=months_fmt,
-        y=[m["net_savings"] for m in recent],
+        y=saving_arr,
         marker_color=COLORS["purple"],
         marker_line_width=0,
         offsetgroup=3,

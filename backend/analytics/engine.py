@@ -100,7 +100,7 @@ def build_dashboard(db: Session) -> DashboardResponse:
     acct_monthly_map: dict = defaultdict(lambda: {"expense": 0.0, "income": 0.0, "investment": 0.0})
     for row in acct_type_rows:
         k = (row.month, _acct_type(row.account))
-        acct_monthly_map[k][row.type] += row.total
+        acct_monthly_map[k][row.type] += float(row.total or 0)
 
     acct_monthly_list = [
         {
@@ -127,7 +127,7 @@ def build_dashboard(db: Session) -> DashboardResponse:
     )
     acct_cat_map: dict = defaultdict(float)
     for row in acct_cat_rows:
-        acct_cat_map[(row.month, _acct_type(row.account), row.category)] += row.total
+        acct_cat_map[(row.month, _acct_type(row.account), row.category)] += float(row.total or 0)
 
     acct_cat_list = [
         {"month": k[0], "account_type": k[1], "category": k[2], "total_amount": v}
