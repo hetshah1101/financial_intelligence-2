@@ -41,9 +41,15 @@ COLUMN_PRIORITY = {
     ],
     "Note / Description": [
         "note / description",
-        "description",
         "note",
+        "narration",
         "memo",
+        "remarks",
+        "particulars",
+        "details",
+        "transaction description",
+        "transaction narration",
+        "description",
     ],
 }
 
@@ -69,10 +75,8 @@ def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
     # Rename columns
     if actual_to_standard:
         df = df.rename(columns=actual_to_standard)
-        # Drop duplicate columns (keep only the renamed ones)
-        # Drop unnamed columns and duplicates
-        cols_to_drop = [c for c in df.columns if c not in actual_to_standard.values()
-                       and not c.startswith('Unnamed')]
+        # Drop only auto-generated unnamed index columns (e.g. "Unnamed: 0")
+        cols_to_drop = [c for c in df.columns if c.startswith('Unnamed')]
         df = df.drop(columns=cols_to_drop, errors='ignore')
 
     return df

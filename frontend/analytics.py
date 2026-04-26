@@ -198,6 +198,68 @@ def fmt_period_label(period: str, granularity: str) -> str:
     return period
 
 
+def aggregate_account_by_granularity(
+    account_monthly: list, granularity: str, metric: str
+) -> dict:
+    """Return {account_type: (periods, period_labels, values)} aggregated by granularity.
+    metric is one of 'expense', 'income', 'investment'.
+    """
+    if not account_monthly:
+        return {}
+
+    df = pd.DataFrame(account_monthly)
+    if metric not in df.columns:
+        return {}
+
+    df["date"] = pd.to_datetime(df["month"] + "-01")
+    if granularity == "monthly":
+        df["period"] = df["month"]
+    elif granularity == "quarterly":
+        df["period"] = df["date"].dt.to_period("Q").astype(str)
+    elif granularity == "yearly":
+        df["period"] = df["date"].dt.year.astype(str)
+    else:
+        df["period"] = df["month"]
+
+    result = {}
+    for acct_type, group in df.groupby("account_type"):
+        agg = group.groupby("period")[metric].sum().reset_index().sort_values("period")
+        periods = agg["period"].tolist()
+        labels = [fmt_period_label(p, granularity) for p in periods]
+        amounts = agg[metric].tolist()
+        result[str(acct_type)] = (periods, labels, amounts)
+    return result
+
+
+def aggregate_account_category_by_granularity(
+    account_cat: list, granularity: str, category: str
+) -> dict:
+    """Return {account_type: (periods, period_labels, amounts)} for a specific category."""
+    cat_rows = [r for r in account_cat if r["category"] == category]
+    if not cat_rows:
+        return {}
+
+    df = pd.DataFrame(cat_rows)
+    df["date"] = pd.to_datetime(df["month"] + "-01")
+    if granularity == "monthly":
+        df["period"] = df["month"]
+    elif granularity == "quarterly":
+        df["period"] = df["date"].dt.to_period("Q").astype(str)
+    elif granularity == "yearly":
+        df["period"] = df["date"].dt.year.astype(str)
+    else:
+        df["period"] = df["month"]
+
+    result = {}
+    for acct_type, group in df.groupby("account_type"):
+        agg = group.groupby("period")["total_amount"].sum().reset_index().sort_values("period")
+        periods = agg["period"].tolist()
+        labels = [fmt_period_label(p, granularity) for p in periods]
+        amounts = agg["total_amount"].tolist()
+        result[str(acct_type)] = (periods, labels, amounts)
+    return result
+
+
 def build_category_diffs(
     current_cats: dict, baseline_cats: dict
 ) -> list:

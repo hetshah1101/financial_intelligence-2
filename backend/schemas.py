@@ -25,6 +25,21 @@ class CategoryAggregateSchema(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AccountMonthlySchema(BaseModel):
+    month: str
+    account_type: str  # "Bank" or "Card"
+    expense: float
+    income: float
+    investment: float
+
+
+class AccountCategorySchema(BaseModel):
+    month: str
+    account_type: str
+    category: str
+    total_amount: float
+
+
 class YearlyAggregateSchema(BaseModel):
     year: int
     total_income: float
@@ -112,6 +127,8 @@ class DashboardResponse(BaseModel):
     monthly_aggregates: list[MonthlyAggregateSchema]
     yearly_aggregates: list[YearlyAggregateSchema]
     category_aggregates: list[CategoryAggregateSchema]
+    account_monthly_aggregates: list[AccountMonthlySchema] = []
+    account_category_aggregates: list[AccountCategorySchema] = []
     monthly_trends: list[MonthlyTrendPoint]
     yearly_trends: list[YearlyTrendPoint]
     category_trends: list[CategoryTrendPoint]

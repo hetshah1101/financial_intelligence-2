@@ -76,7 +76,7 @@ def render_alerts(dashboard: dict | None) -> None:
             styled = df_opp.style.map(_green, subset=["Could Save"])
         except AttributeError:
             styled = df_opp.style.applymap(_green, subset=["Could Save"])
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        st.dataframe(styled, width="stretch", hide_index=True)
     else:
         st.markdown(
             f'<div style="color:{COLORS["text_tertiary"]};font-size:13px;padding:12px">'

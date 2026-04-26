@@ -3,6 +3,8 @@ import streamlit as st
 from analytics import (
     aggregate_by_granularity,
     aggregate_category_by_granularity,
+    aggregate_account_by_granularity,
+    aggregate_account_category_by_granularity,
     fmt_period_label,
 )
 from charts import make_trends_chart
@@ -32,6 +34,8 @@ def render_trends(dashboard: dict | None) -> None:
 
     monthly = sorted(dashboard.get("monthly_aggregates", []), key=lambda x: x["month"])
     all_cat_agg = dashboard.get("category_aggregates", [])
+    account_monthly = dashboard.get("account_monthly_aggregates", [])
+    account_cat_agg = dashboard.get("account_category_aggregates", [])
     if not monthly:
         st.info("Upload data to see trends.")
         return
@@ -77,25 +81,65 @@ def render_trends(dashboard: dict | None) -> None:
                 sel_cat = None
 
     # ── Re-aggregate based on selected granularity ────────────────────────────
+    # Metric → account schema field (net_savings is derived, no per-account split)
+    _metric_to_acct_field = {
+        "total_expense":    "expense",
+        "total_income":     "income",
+        "total_investment": "investment",
+    }
+    _acct_colors = {"Bank": COLORS["blue"], "Card": COLORS["amber"]}
+
     if mode == "system":
         aggregated = aggregate_by_granularity(monthly, granularity)
         periods = [r["period"] for r in aggregated]
         period_labels = [fmt_period_label(p, granularity) for p in periods]
-        traces = [
-            {
-                "y":     [r.get(metric, 0) for r in aggregated],
-                "name":  next(k for k, v in METRIC_OPTIONS.items() if v == metric),
-                "color": METRIC_COLORS.get(metric, COLORS["purple"]),
-            }
-        ]
         y_primary = [r.get(metric, 0) for r in aggregated]
+
+        acct_field = _metric_to_acct_field.get(metric)
+        acct_data = aggregate_account_by_granularity(account_monthly, granularity, acct_field) if acct_field else {}
+
+        if len(acct_data) > 1:
+            # Build one trace per account type, aligned to canonical periods
+            traces = []
+            for acct_type in sorted(acct_data.keys()):
+                p_list, _, amt_list = acct_data[acct_type]
+                p_map = dict(zip(p_list, amt_list))
+                aligned = [p_map.get(p, 0) for p in periods]
+                traces.append({
+                    "y":    aligned,
+                    "name": f"{acct_type} {metric_label}",
+                    "color": _acct_colors.get(acct_type, COLORS["purple"]),
+                })
+        else:
+            traces = [
+                {
+                    "y":     y_primary,
+                    "name":  next(k for k, v in METRIC_OPTIONS.items() if v == metric),
+                    "color": METRIC_COLORS.get(metric, COLORS["purple"]),
+                }
+            ]
     else:
         if sel_cat:
-            _, period_labels, amounts = aggregate_category_by_granularity(
+            cat_periods, period_labels, amounts = aggregate_category_by_granularity(
                 all_cat_agg, granularity, sel_cat
             )
-            traces = [{"y": amounts, "name": sel_cat, "color": COLORS["purple"]}]
             y_primary = amounts
+            acct_cat_data = aggregate_account_category_by_granularity(
+                account_cat_agg, granularity, sel_cat
+            )
+            if len(acct_cat_data) > 1:
+                traces = []
+                for acct_type in sorted(acct_cat_data.keys()):
+                    p_list, _, amt_list = acct_cat_data[acct_type]
+                    p_map = dict(zip(p_list, amt_list))
+                    aligned = [p_map.get(p, 0) for p in cat_periods]
+                    traces.append({
+                        "y":     aligned,
+                        "name":  f"{acct_type} ({sel_cat})",
+                        "color": _acct_colors.get(acct_type, COLORS["purple"]),
+                    })
+            else:
+                traces = [{"y": amounts, "name": sel_cat, "color": COLORS["purple"]}]
         else:
             period_labels, traces, y_primary = [], [], []
 
@@ -115,7 +159,7 @@ def render_trends(dashboard: dict | None) -> None:
 
     # ── Chart ─────────────────────────────────────────────────────────────────
     fig = make_trends_chart([], period_labels, traces)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
 def _render_trend_insights(

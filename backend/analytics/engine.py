@@ -1,7 +1,9 @@
 import pandas as pd
+from collections import defaultdict
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import MonthlyAggregate, CategoryAggregate, YearlyAggregate
+from models import MonthlyAggregate, CategoryAggregate, YearlyAggregate, Transaction
 from analytics.monthly import compute_monthly_aggregates
 from analytics.yearly import compute_yearly_aggregates
 from analytics.category import compute_category_aggregates
@@ -11,6 +13,19 @@ from analytics.behavior import compute_spending_behavior
 from analytics.budget import compute_budget_baseline
 from analytics.savings import compute_savings_opportunities
 from schemas import DashboardResponse
+
+# Card credit/charge account name fragments (case-insensitive substring match)
+_CARD_KEYWORDS = ("card", "credit", "amex", "onecard", "slice")
+_DEBIT_KEYWORDS = ("debit",)
+
+
+def _acct_type(name: str) -> str:
+    n = name.strip().lower()
+    if any(kw in n for kw in _DEBIT_KEYWORDS):
+        return "Bank"
+    if any(kw in n for kw in _CARD_KEYWORDS):
+        return "Card"
+    return "Bank"
 
 
 def recompute_aggregates(db: Session, months: list[str] | None = None) -> None:
@@ -70,6 +85,55 @@ def build_dashboard(db: Session) -> DashboardResponse:
     budget = compute_budget_baseline(category_df)
     savings = compute_savings_opportunities(category_df, budget)
 
+    # ── Account-level monthly breakdown (Bank vs Card) ───────────────────────
+    acct_type_rows = (
+        db.query(
+            Transaction.month,
+            Transaction.account,
+            Transaction.type,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .filter(Transaction.type.in_(["expense", "income", "investment"]))
+        .group_by(Transaction.month, Transaction.account, Transaction.type)
+        .all()
+    )
+    acct_monthly_map: dict = defaultdict(lambda: {"expense": 0.0, "income": 0.0, "investment": 0.0})
+    for row in acct_type_rows:
+        k = (row.month, _acct_type(row.account))
+        acct_monthly_map[k][row.type] += row.total
+
+    acct_monthly_list = [
+        {
+            "month": k[0],
+            "account_type": k[1],
+            "expense": v["expense"],
+            "income": v["income"],
+            "investment": v["investment"],
+        }
+        for k, v in sorted(acct_monthly_map.items())
+    ]
+
+    # ── Account-level category breakdown (expenses only) ─────────────────────
+    acct_cat_rows = (
+        db.query(
+            Transaction.month,
+            Transaction.account,
+            Transaction.category,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .filter(Transaction.type == "expense")
+        .group_by(Transaction.month, Transaction.account, Transaction.category)
+        .all()
+    )
+    acct_cat_map: dict = defaultdict(float)
+    for row in acct_cat_rows:
+        acct_cat_map[(row.month, _acct_type(row.account), row.category)] += row.total
+
+    acct_cat_list = [
+        {"month": k[0], "account_type": k[1], "category": k[2], "total_amount": v}
+        for k, v in sorted(acct_cat_map.items())
+    ]
+
     return DashboardResponse(
         monthly_aggregates=[{
             "month": r.month,
@@ -94,6 +158,8 @@ def build_dashboard(db: Session) -> DashboardResponse:
             "percentage_of_total_expense": r.percentage_of_total_expense,
             "tag": r.tag,
         } for r in category_rows],
+        account_monthly_aggregates=acct_monthly_list,
+        account_category_aggregates=acct_cat_list,
         monthly_trends=monthly_trends,
         yearly_trends=yearly_trends,
         category_trends=category_trends,

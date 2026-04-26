@@ -48,6 +48,16 @@ def api_upload(endpoint: str, file) -> dict | None:
         return None
 
 
+def api_reset() -> dict | None:
+    try:
+        r = requests.delete(f"{API_BASE}/reset", timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        st.error(f"Reset failed: {e}")
+        return None
+
+
 def categories_for_month(dashboard: dict, month: str) -> list:
     """Filter category_aggregates for a specific month, sorted by amount desc."""
     return sorted(

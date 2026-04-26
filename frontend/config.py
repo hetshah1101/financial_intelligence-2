@@ -17,7 +17,7 @@ COLORS = {
     "chart":          ["#7c6fcd", "#4caf7d", "#c9883a", "#4a90c4", "#e05252", "#6b9e8f", "#888780"],
 }
 
-API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE = os.getenv("API_BASE_URL", "http://localhost:8001")
 
 GLOBAL_CSS = """
 <style>

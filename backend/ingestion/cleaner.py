@@ -37,15 +37,14 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         df.get("Subcategory", pd.Series(dtype=str)).notna(), other=None
     )
 
-    # Preserve description: try all plausible column names in priority order.
-    # The column_mapper may rename the source column, so check both the standard
-    # name and common raw names from user CSVs (narration, remarks, particulars…).
-    _desc_candidates = [
-        "Note / Description", "description", "narration", "note",
+    # Preserve description: case-insensitive match against known column name variants.
+    _desc_candidates = {
+        "note / description", "description", "narration", "note",
         "memo", "remarks", "particulars", "details",
         "transaction description", "transaction narration",
-    ]
-    _desc_col = next((c for c in _desc_candidates if c in df.columns), None)
+    }
+    _desc_col = next((c for c in df.columns if c.strip().lower() in _desc_candidates), None)
+    print(f"[DEBUG cleaner] columns={df.columns.tolist()} desc_col={_desc_col!r}")
     if _desc_col:
         df["description"] = df[_desc_col].fillna("").astype(str).str.strip()
     else:

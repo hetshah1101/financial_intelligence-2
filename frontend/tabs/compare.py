@@ -24,6 +24,7 @@ def render_compare(dashboard: dict | None) -> None:
 
     monthly = sorted(dashboard.get("monthly_aggregates", []), key=lambda x: x["month"])
     all_cat_agg = dashboard.get("category_aggregates", [])
+    all_acct_cat = dashboard.get("account_category_aggregates", [])
     latest = monthly[-1] if monthly else {}
 
     months_list = api_months()
@@ -178,8 +179,21 @@ def render_compare(dashboard: dict | None) -> None:
         cats      = [d["category"] for d in top10]
         curr_vals = [d["current"]  for d in top10]
         base_vals = [d["baseline"] for d in top10]
-        fig = make_category_bar(cats, curr_vals, base_vals, fmt_month(selected_month))
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+        # Build account split for current month categories
+        account_cat_data: dict = {}
+        for row in all_acct_cat:
+            if row["month"] == selected_month:
+                cat = row["category"]
+                if cat not in account_cat_data:
+                    account_cat_data[cat] = {}
+                account_cat_data[cat][row["account_type"]] = row["total_amount"]
+
+        fig = make_category_bar(
+            cats, curr_vals, base_vals, fmt_month(selected_month),
+            account_cat_data=account_cat_data if account_cat_data else None,
+        )
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
     # ── Comparison table ──────────────────────────────────────────────────────
     if cat_diffs:
@@ -210,4 +224,4 @@ def render_compare(dashboard: dict | None) -> None:
             styled = df_compare.style.map(_color_pct, subset=["% Change"])
         except AttributeError:
             styled = df_compare.style.applymap(_color_pct, subset=["% Change"])
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        st.dataframe(styled, width="stretch", hide_index=True)

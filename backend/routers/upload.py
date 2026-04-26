@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from ingestion.pipeline import run_pipeline
 from analytics.engine import recompute_aggregates
+from models import Transaction, MonthlyAggregate, CategoryAggregate, YearlyAggregate
 from schemas import UploadResponse
 
 router = APIRouter()
@@ -24,6 +25,14 @@ def _read_upload(file: UploadFile) -> pd.DataFrame:
             return pd.read_csv(io.BytesIO(content))
         except Exception:
             return pd.read_excel(io.BytesIO(content))
+
+
+@router.delete("/reset")
+def reset_all(db: Session = Depends(get_db)):
+    for model in [CategoryAggregate, MonthlyAggregate, YearlyAggregate, Transaction]:
+        db.query(model).delete()
+    db.commit()
+    return {"status": "ok", "message": "All tables truncated."}
 
 
 @router.post("/upload", response_model=UploadResponse)

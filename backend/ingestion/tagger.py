@@ -3,15 +3,15 @@ import pandas as pd
 # Categories classified as essential needs
 ESSENTIAL = {
     # Housing & utilities
-    "rent", "home", "emi", "housing",
+    "rent", "home", "emi", "housing", "family",
     "utilities", "electricity", "water", "gas", "internet", "mobile",
     # Food staples
     "groceries", "grocery", "food",
     # Health
     "medical", "healthcare", "health", "pharmacy", "doctor", "medicine",
-    "insurance",
+    "medicines", "insurance",
     # Transport
-    "transport", "commute", "petrol", "fuel",
+    "transport", "transportation", "commute", "petrol", "fuel",
     # Education & tax
     "education", "tax",
 }
@@ -19,18 +19,22 @@ ESSENTIAL = {
 # Categories classified as discretionary spending
 DISCRETIONARY = {
     # Food & drink out
-    "dining out", "food delivery", "restaurant", "cafe",
+    "dining out", "food delivery", "restaurant", "cafe", "cookie",
+    # Alcohol
+    "alcohol",
     # Entertainment & leisure
     "entertainment", "ott", "subscriptions", "streaming", "gaming",
     "books", "music",
-    # Shopping
-    "shopping", "clothing", "electronics", "accessories", "gadgets",
-    "fashion",
+    # Shopping & personal
+    "shopping", "clothing", "clothes", "electronics", "accessories",
+    "gadgets", "fashion", "personal", "personal care", "beauty",
+    "💄 beauty",
     # Travel & stays
     "travel", "hotel", "flights", "vacation",
-    # Personal & social
-    "personal care", "fitness", "gym", "sports",
-    "gifts", "gift", "social life", "family",
+    # Fitness
+    "fitness", "gym", "sports",
+    # Social & giving
+    "gifts", "gift", "social life", "donate",
     # Misc
     "miscellaneous", "other",
 }

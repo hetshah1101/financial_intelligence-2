@@ -44,10 +44,12 @@ def render_overview(dashboard: dict | None) -> None:
     baseline = compute_baseline(prior_months + [month_agg], "12m_avg")
     categories = categories_for_month(dashboard, selected_month)
 
+    account_monthly = dashboard.get("account_monthly_aggregates", [])
+
     # ── Render sections ───────────────────────────────────────────────────────
     _render_takeaways(month_agg, baseline, categories)
     _render_kpi_row(month_agg, baseline)
-    _render_charts_row(monthly, categories, selected_month)
+    _render_charts_row(monthly, categories, selected_month, account_monthly)
     _render_behavioral_section(categories, monthly, selected_month)
 
 
@@ -102,15 +104,15 @@ def _render_kpi_row(month_agg: dict, baseline: dict | None) -> None:
     kpi_card(col4, "Net Savings", month_agg["net_savings"],      b.get("net_savings"),      invert=False)
 
 
-def _render_charts_row(monthly: list, categories: list, selected_month: str) -> None:
+def _render_charts_row(monthly: list, categories: list, selected_month: str, account_monthly: list | None = None) -> None:
     col_bar, col_donut = st.columns([6, 4])
     with col_bar:
-        fig = make_overview_bar(monthly, selected_month)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        fig = make_overview_bar(monthly, selected_month, account_monthly)
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     with col_donut:
         if categories:
             fig = make_donut(categories)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
         else:
             st.markdown(
                 f'<div style="color:{COLORS["text_tertiary"]};padding:48px;text-align:center">'

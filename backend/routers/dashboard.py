@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from analytics.engine import build_dashboard
+from models import MonthlyAggregate
 from schemas import DashboardResponse
 
 router = APIRouter()
@@ -11,3 +12,13 @@ router = APIRouter()
 @router.get("/dashboard", response_model=DashboardResponse)
 def get_dashboard(db: Session = Depends(get_db)):
     return build_dashboard(db)
+
+
+@router.get("/months")
+def get_months(db: Session = Depends(get_db)):
+    months = (
+        db.query(MonthlyAggregate.month)
+        .order_by(MonthlyAggregate.month.desc())
+        .all()
+    )
+    return {"months": [m[0] for m in months]}

@@ -44,8 +44,12 @@ def base_layout(**kwargs) -> dict:
     return layout
 
 
-def make_overview_bar(monthly_data: list, selected_month: str | None = None) -> go.Figure:
-    """Grouped bar chart: Income / Expense / Net Savings for the 12 months ending at selected_month."""
+def make_overview_bar(
+    monthly_data: list,
+    selected_month: str | None = None,
+    account_monthly: list | None = None,
+) -> go.Figure:
+    """4-group bar chart: Income / Expense(stacked Bank+Card) / Investment / Net Savings."""
     if selected_month:
         recent = [m for m in monthly_data if m["month"] <= selected_month][-12:]
     else:
@@ -53,29 +57,83 @@ def make_overview_bar(monthly_data: list, selected_month: str | None = None) -> 
     months_raw = [m["month"] for m in recent]
     months_fmt = fmt_month_axis(months_raw)
 
+    # Build per-account expense arrays if account data available
+    bank_exp = [0.0] * len(recent)
+    card_exp = [0.0] * len(recent)
+    has_acct = False
+    if account_monthly:
+        by_key = {(r["month"], r["account_type"]): r for r in account_monthly}
+        for i, m in enumerate(recent):
+            b = by_key.get((m["month"], "Bank"))
+            c = by_key.get((m["month"], "Card"))
+            bank_exp[i] = b["expense"] if b else 0.0
+            card_exp[i] = c["expense"] if c else 0.0
+        has_acct = any(v > 0 for v in card_exp)  # only split if card data exists
+
     fig = go.Figure()
+
+    # Group 0 — Income
     fig.add_trace(go.Bar(
         name="Income",
         x=months_fmt,
         y=[m["total_income"] for m in recent],
         marker_color=COLORS["green"],
         marker_line_width=0,
+        offsetgroup=0,
         hovertemplate="<b>%{x}</b><br>Income: ₹%{y:,.0f}<extra></extra>",
     ))
+
+    # Group 1 — Expense (stacked Bank + Card, or single total)
+    if has_acct:
+        fig.add_trace(go.Bar(
+            name="Bank Expense",
+            x=months_fmt,
+            y=bank_exp,
+            marker_color=COLORS["red"],
+            marker_line_width=0,
+            offsetgroup=1,
+            hovertemplate="<b>%{x}</b><br>Bank Expense: ₹%{y:,.0f}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            name="Card Expense",
+            x=months_fmt,
+            y=card_exp,
+            base=bank_exp,
+            marker_color=COLORS["amber"],
+            marker_line_width=0,
+            offsetgroup=1,
+            hovertemplate="<b>%{x}</b><br>Card Expense: ₹%{y:,.0f}<extra></extra>",
+        ))
+    else:
+        fig.add_trace(go.Bar(
+            name="Expenses",
+            x=months_fmt,
+            y=[m["total_expense"] for m in recent],
+            marker_color=COLORS["red"],
+            marker_line_width=0,
+            offsetgroup=1,
+            hovertemplate="<b>%{x}</b><br>Expenses: ₹%{y:,.0f}<extra></extra>",
+        ))
+
+    # Group 2 — Investment
     fig.add_trace(go.Bar(
-        name="Expenses",
+        name="Investment",
         x=months_fmt,
-        y=[m["total_expense"] for m in recent],
-        marker_color=COLORS["red"],
+        y=[m["total_investment"] for m in recent],
+        marker_color=COLORS["blue"],
         marker_line_width=0,
-        hovertemplate="<b>%{x}</b><br>Expense: ₹%{y:,.0f}<extra></extra>",
+        offsetgroup=2,
+        hovertemplate="<b>%{x}</b><br>Investment: ₹%{y:,.0f}<extra></extra>",
     ))
+
+    # Group 3 — Net Savings
     fig.add_trace(go.Bar(
         name="Net Savings",
         x=months_fmt,
         y=[m["net_savings"] for m in recent],
         marker_color=COLORS["purple"],
         marker_line_width=0,
+        offsetgroup=3,
         hovertemplate="<b>%{x}</b><br>Net Savings: ₹%{y:,.0f}<extra></extra>",
     ))
 
@@ -90,12 +148,9 @@ def make_overview_bar(monthly_data: list, selected_month: str | None = None) -> 
 
     fig.update_layout(
         **base_layout(
-            title=dict(
-                text="12-Month Overview",
-                font=dict(size=13, color=COLORS["text_secondary"]),
-            ),
+            title=dict(text="12-Month Overview", font=dict(size=13, color=COLORS["text_secondary"])),
             barmode="group",
-            height=300,
+            height=320,
         )
     )
     return fig
@@ -139,28 +194,54 @@ def make_category_bar(
     current_vals: list,
     baseline_vals: list,
     current_label: str,
+    account_cat_data: dict | None = None,
 ) -> go.Figure:
-    """Grouped bar: current month vs baseline per category."""
+    """Grouped bar: current (stacked Bank+Card if data available) vs baseline per category."""
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name=current_label,
-        x=categories,
-        y=current_vals,
-        marker_color=COLORS["purple"],
-        marker_line_width=0,
-        width=0.35,
-        hovertemplate="<b>%{x}</b><br>Current: ₹%{y:,.0f}<extra></extra>",
-    ))
+
+    if account_cat_data:
+        bank_vals = [account_cat_data.get(c, {}).get("Bank", 0.0) for c in categories]
+        card_vals = [account_cat_data.get(c, {}).get("Card", 0.0) for c in categories]
+        fig.add_trace(go.Bar(
+            name="Bank",
+            x=categories,
+            y=bank_vals,
+            marker_color=COLORS["blue"],
+            marker_line_width=0,
+            offsetgroup="current",
+            hovertemplate="<b>%{x}</b><br>Bank: ₹%{y:,.0f}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            name="Card",
+            x=categories,
+            y=card_vals,
+            base=bank_vals,
+            marker_color=COLORS["amber"],
+            marker_line_width=0,
+            offsetgroup="current",
+            hovertemplate="<b>%{x}</b><br>Card: ₹%{y:,.0f}<extra></extra>",
+        ))
+    else:
+        fig.add_trace(go.Bar(
+            name=current_label,
+            x=categories,
+            y=current_vals,
+            marker_color=COLORS["purple"],
+            marker_line_width=0,
+            offsetgroup="current",
+            hovertemplate="<b>%{x}</b><br>Current: ₹%{y:,.0f}<extra></extra>",
+        ))
+
     fig.add_trace(go.Bar(
         name="Baseline",
         x=categories,
         y=baseline_vals,
         marker_color=COLORS["border"],
         marker_line_width=0,
-        width=0.35,
+        offsetgroup="baseline",
         hovertemplate="<b>%{x}</b><br>Baseline: ₹%{y:,.0f}<extra></extra>",
     ))
-    # Dashed baseline reference line (mean of baseline values)
+
     if baseline_vals:
         avg_baseline = sum(baseline_vals) / len(baseline_vals)
         fig.add_hline(
