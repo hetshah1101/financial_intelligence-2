@@ -452,6 +452,7 @@ def render_alerts(dashboard: dict | None) -> None:
         ]
 
     _render_health_score(score, verdict)
+    _render_savings_narrative(dashboard)
 
     if not anomalies:
         _render_all_clear(dashboard)
@@ -460,5 +461,3 @@ def render_alerts(dashboard: dict | None) -> None:
 
         anomaly_cats = {a["category"] for a in anomalies}
         _render_mom_table(dashboard, anomaly_cats)
-
-    _render_savings_narrative(dashboard)

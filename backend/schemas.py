@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic import BaseModel
 from typing import Optional
 
@@ -223,12 +224,12 @@ class GoalSchema(BaseModel):
     id: int
     name: str
     target_amount: float
-    target_date: Optional[str] = None
+    target_date: Optional[date] = None
     current_amount: float
     monthly_sip: float
     linked_isin: Optional[str] = None
     notes: Optional[str] = None
-    created_at: Optional[str] = None
+    created_at: Optional[date] = None
 
     model_config = {"from_attributes": True}
 

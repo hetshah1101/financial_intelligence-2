@@ -173,14 +173,26 @@ def aggregate_by_granularity(monthly_data: list, granularity: str) -> list:
 
 
 def aggregate_category_by_granularity(
-    all_cat_agg: list, granularity: str, category: str
+    all_cat_agg: list, granularity: str, category: str,
+    all_months: list | None = None,
 ) -> tuple:
-    """Return (periods, period_labels, amounts) for a single category."""
+    """Return (periods, period_labels, amounts) for a single category.
+
+    When all_months is supplied the series is zero-filled so every month in the
+    full date range is represented, even if the category had no spend that month.
+    """
     cat_rows = [r for r in all_cat_agg if r["category"] == category]
-    if not cat_rows:
+
+    if all_months:
+        month_amounts = {r["month"]: r["total_amount"] for r in cat_rows}
+        rows = [{"month": m, "total_amount": month_amounts.get(m, 0.0)}
+                for m in sorted(set(all_months))]
+        df = pd.DataFrame(rows)
+    elif cat_rows:
+        df = pd.DataFrame(cat_rows)
+    else:
         return [], [], []
 
-    df = pd.DataFrame(cat_rows)
     df["date"] = pd.to_datetime(df["month"] + "-01")
 
     if granularity == "monthly":

@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 from analytics import behavioral_split, compute_baseline, generate_takeaways
 from api import api_months, categories_for_month
@@ -51,6 +52,7 @@ def render_overview(dashboard: dict | None) -> None:
     _render_kpi_row(month_agg, baseline)
     _render_charts_row(monthly, categories, selected_month, account_monthly)
     _render_behavioral_section(categories, monthly, selected_month)
+    _render_data_link()
 
 
 def _render_takeaways(month_agg: dict, baseline: dict | None, categories: list) -> None:
@@ -298,18 +300,64 @@ def _render_category_breakdown(categories: list) -> None:
             )
 
 
+def _render_data_link() -> None:
+    st.markdown(
+        f'<hr style="border:none;border-top:1px solid {COLORS["border"]};margin:32px 0 0">',
+        unsafe_allow_html=True,
+    )
+    components.html(
+        """
+        <div style="text-align:center;padding:12px 0">
+          <button
+            onclick="(function(){
+              var t=window.parent.document.querySelectorAll('[data-baseweb=\\'tab\\']');
+              if(t&&t[4]){t[4].click();}
+            })()"
+            style="cursor:pointer;color:#888780;font-size:13px;font-family:inherit;
+                   background:#1e1e1e;padding:8px 22px;border-radius:8px;
+                   border:1px solid #2a2a2a">
+            &#x229E; &nbsp;Upload / View Data
+          </button>
+        </div>
+        """,
+        height=56,
+        scrolling=False,
+    )
+
+
 def _empty_state() -> None:
     st.markdown(f"""
     <div style="display:flex;flex-direction:column;align-items:center;
-                justify-content:center;min-height:60vh;text-align:center">
+                justify-content:center;min-height:40vh;text-align:center;padding-top:48px">
       <div style="font-size:48px;color:{COLORS['border']};margin-bottom:24px">₹</div>
       <h2 style="color:{COLORS['text_primary']};font-weight:500;margin-bottom:8px">Welcome to Finsight</h2>
-      <p style="color:{COLORS['text_secondary']};font-size:14px;margin-bottom:24px">
-        Upload your transaction data in the Data tab to get started
+      <p style="color:{COLORS['text_secondary']};font-size:14px;margin-bottom:4px">
+        Upload your transaction data to get started
       </p>
-      <div style="display:flex;gap:8px;font-size:12px;color:{COLORS['text_tertiary']}">
-        <span style="background:{COLORS['bg_elevated']};padding:4px 12px;border-radius:6px">CSV</span>
-        <span style="background:{COLORS['bg_elevated']};padding:4px 12px;border-radius:6px">XLSX</span>
-      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    components.html(
+        """
+        <div style="text-align:center;padding:8px 0 16px">
+          <button
+            onclick="(function(){
+              var t=window.parent.document.querySelectorAll('[data-baseweb=\\'tab\\']');
+              if(t&&t[4]){t[4].click();}
+            })()"
+            style="cursor:pointer;color:#888780;font-size:13px;font-family:inherit;
+                   background:#1e1e1e;padding:10px 28px;border-radius:8px;
+                   border:1px solid #2a2a2a">
+            &#x229E; &nbsp;Go to Data tab
+          </button>
+        </div>
+        """,
+        height=60,
+        scrolling=False,
+    )
+    st.markdown(f"""
+    <div style="display:flex;gap:8px;font-size:12px;color:{COLORS['text_tertiary']};
+                justify-content:center;padding-bottom:48px">
+      <span style="background:{COLORS['bg_elevated']};padding:4px 12px;border-radius:6px">CSV</span>
+      <span style="background:{COLORS['bg_elevated']};padding:4px 12px;border-radius:6px">XLSX</span>
     </div>
     """, unsafe_allow_html=True)

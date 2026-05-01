@@ -28,7 +28,7 @@ def _api(path: str, method: str = "GET", json: dict | None = None):
         return None
 
 
-def render_networth() -> None:
+def render_networth(dashboard: dict | None = None) -> None:
     st.markdown(f"""
     <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;
                 color:{COLORS['text_secondary']};margin-bottom:20px">
@@ -36,31 +36,40 @@ def render_networth() -> None:
     </div>
     """, unsafe_allow_html=True)
 
+    liquid_cash = 0
+    if dashboard:
+        monthly = dashboard.get("monthly_aggregates", [])
+        liquid_cash = sum(m.get("net_savings", 0) for m in monthly)
+
     networth = _api("/networth/summary")
     history  = _api("/networth/history") or []
     goals    = _api("/goals") or []
 
     if networth:
-        _render_waterfall(networth)
+        _render_waterfall(networth, goals, liquid_cash)
         if len(history) >= 2:
             _render_trend(history)
     else:
         st.info("Upload a portfolio snapshot to see net worth.")
 
-    _render_goals(goals)
+    total_wealth = (networth.get("net_worth", 0) if networth else 0) + liquid_cash
+    _render_goals(goals, total_wealth)
     _render_add_goal_form()
 
 
-def _render_waterfall(nw: dict) -> None:
+def _render_waterfall(nw: dict, goals: list, liquid_cash: float = 0) -> None:
     assets = nw.get("total_assets", 0)
     liabilities = nw.get("total_liabilities", 0)
     net = nw.get("net_worth", 0)
-    net_color = COLORS["green"] if net >= 0 else COLORS["red"]
+
+    total_assets_with_cash = assets + liquid_cash
+    total_net_with_cash = net + liquid_cash
+    net_color = COLORS["green"] if total_net_with_cash >= 0 else COLORS["red"]
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Assets",       fmt_inr(assets))
-    c2.metric("Total Liabilities",  fmt_inr(liabilities))
-    c3.metric("Net Worth",          fmt_inr(net))
+    c1.metric("Total Assets",      fmt_inr(total_assets_with_cash))
+    c2.metric("Total Liabilities", fmt_inr(liabilities))
+    c3.metric("Net Worth",         fmt_inr(total_net_with_cash))
 
     # Waterfall chart
     asset_breakdown = nw.get("asset_breakdown", {})
@@ -69,6 +78,8 @@ def _render_waterfall(nw: dict) -> None:
     measures, x_labels, y_values = [], [], []
     for k, v in asset_breakdown.items():
         measures.append("relative"); x_labels.append(k.replace("_", " ").title()); y_values.append(v)
+    if liquid_cash != 0:
+        measures.append("relative"); x_labels.append("Liquid Cash"); y_values.append(liquid_cash)
     for k, v in liability_breakdown.items():
         measures.append("relative"); x_labels.append(k.replace("_", " ").title()); y_values.append(-v)
     measures.append("total"); x_labels.append("Net Worth"); y_values.append(0)
@@ -95,41 +106,37 @@ def _render_waterfall(nw: dict) -> None:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── Goal gap banner ───────────────────────────────────────────────────────
-    goals = _api("/goals") or []
-    house_goals = [
-        g for g in goals
-        if any(kw in g.get("name", "").lower()
-               for kw in ("house", "home", "property", "flat", "apartment"))
-    ]
-    for g in house_goals:
-        target = g["target_amount"]
-        net = nw.get("net_worth", 0)
-        gap = max(0, target - net)
-        pct = min(100, net / target * 100) if target > 0 else 0
-        color = COLORS["red"] if pct < 25 else COLORS["amber"] if pct < 75 else COLORS["green"]
-        st.markdown(
-            f"""
-            <div style="background:{COLORS['bg_elevated']};
-                        border-left:4px solid {color};
-                        border-radius:6px;padding:14px 18px;margin-top:14px">
-              <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-                          color:{COLORS['text_secondary']};margin-bottom:4px">
-                {g['name']} — Gap to target
-              </div>
-              <div style="display:flex;align-items:baseline;gap:12px">
-                <div style="font-size:22px;color:{color};
-                            font-family:'DM Mono',monospace;font-weight:600">
-                  ₹{gap:,.0f}
-                </div>
-                <div style="font-size:13px;color:{COLORS['text_tertiary']}">
-                  remaining &nbsp;·&nbsp; {pct:.1f}% complete
-                </div>
-              </div>
+    # ── Goal gap banner: biggest goal ─────────────────────────────────────────
+    if not goals:
+        return
+    biggest = max(goals, key=lambda g: g.get("target_amount", 0))
+    target = biggest["target_amount"]
+    current = total_net_with_cash
+    gap = max(0, target - current)
+    pct = min(100, current / target * 100) if target > 0 else 0
+    color = COLORS["red"] if pct < 25 else COLORS["amber"] if pct < 75 else COLORS["green"]
+    st.markdown(
+        f"""
+        <div style="background:{COLORS['bg_elevated']};
+                    border-left:4px solid {color};
+                    border-radius:6px;padding:14px 18px;margin-top:14px">
+          <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+                      color:{COLORS['text_secondary']};margin-bottom:4px">
+            {biggest['name']} — Gap to target (all net worth applied)
+          </div>
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <div style="font-size:22px;color:{color};
+                        font-family:'DM Mono',monospace;font-weight:600">
+              {fmt_inr(gap)}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div style="font-size:13px;color:{COLORS['text_tertiary']}">
+              remaining &nbsp;·&nbsp; {pct:.1f}% complete
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_trend(history: list) -> None:
@@ -160,7 +167,7 @@ def _render_trend(history: list) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_goals(goals: list) -> None:
+def _render_goals(goals: list, total_wealth: float = 0) -> None:
     if not goals:
         return
     st.markdown(f"""
@@ -170,11 +177,14 @@ def _render_goals(goals: list) -> None:
     </div>
     """, unsafe_allow_html=True)
 
+    biggest_id = max(goals, key=lambda g: g.get("target_amount", 0))["id"] if goals else None
+
     cols = st.columns(min(len(goals), 2))
     for i, goal in enumerate(goals):
         col = cols[i % 2]
         target = goal["target_amount"]
-        current = goal["current_amount"] or 0
+        is_biggest = goal["id"] == biggest_id
+        current = total_wealth if is_biggest else (goal["current_amount"] or 0)
         pct = min(100, int(current / target * 100)) if target > 0 else 0
         sip = goal.get("monthly_sip", 0) or 0
 
@@ -212,7 +222,7 @@ def _render_goals(goals: list) -> None:
               </div>
               <div style="display:flex;justify-content:space-between;
                           font-size:12px;color:{COLORS['text_secondary']};margin-bottom:10px">
-                <span>{fmt_inr(current)} saved</span>
+                <span>{fmt_inr(current)} {'net worth' if is_biggest else 'saved'}</span>
                 <span style="color:{fill_color}">{pct}%</span>
               </div>
               <div style="font-size:12px;color:{COLORS['text_secondary']}">{sip_line}</div>
@@ -267,22 +277,21 @@ def _render_add_goal_form() -> None:
         with st.form("add_goal"):
             name          = st.text_input("Goal name (e.g. House Down Payment)")
             target_amount = st.number_input("Target amount (₹)", min_value=0.0, step=10000.0)
-            current_amount= st.number_input("Currently saved (₹)", min_value=0.0, step=1000.0)
-            monthly_sip   = st.number_input("Monthly SIP / contribution (₹)", min_value=0.0, step=500.0)
             target_date   = st.date_input("Target date", value=None)
-            notes         = st.text_area("Notes (optional)")
-            submitted = st.form_submit_button("Save Goal")
+            description   = st.text_area("Description (optional)")
+            submitted     = st.form_submit_button("Save Goal")
 
-        if submitted and name:
-            payload = {
-                "name": name,
-                "target_amount": target_amount,
-                "current_amount": current_amount,
-                "monthly_sip": monthly_sip,
-                "target_date": str(target_date) if target_date else None,
-                "notes": notes or None,
-            }
-            result = _api("/goals", method="POST", json=payload)
-            if result:
-                st.success(f"Goal '{name}' saved.")
-                st.rerun()
+            if submitted:
+                if not name:
+                    st.error("Goal name is required.")
+                else:
+                    payload = {
+                        "name": name,
+                        "target_amount": float(target_amount),
+                        "target_date": target_date.isoformat() if target_date else None,
+                        "notes": description or None,
+                    }
+                    result = _api("/goals", method="POST", json=payload)
+                    if result:
+                        st.success(f"Goal '{name}' saved.")
+                        st.rerun()

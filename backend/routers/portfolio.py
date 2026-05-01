@@ -425,8 +425,11 @@ def list_goals(db: Session = Depends(get_db)):
 
 @router.post("/goals", response_model=GoalSchema)
 def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
-    from datetime import date as dt
-    obj = Goal(**body.model_dump(), created_at=dt.today())
+    from datetime import date as dt, date
+    data = body.model_dump()
+    if isinstance(data.get("target_date"), str) and data["target_date"]:
+        data["target_date"] = date.fromisoformat(data["target_date"])
+    obj = Goal(**data, created_at=dt.today())
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -435,10 +438,13 @@ def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
 
 @router.put("/goals/{goal_id}", response_model=GoalSchema)
 def update_goal(goal_id: int, body: GoalUpdate, db: Session = Depends(get_db)):
+    from datetime import date
     obj = db.query(Goal).filter(Goal.id == goal_id).first()
     if not obj:
         raise HTTPException(404, "Goal not found")
     for field, val in body.model_dump(exclude_none=True).items():
+        if field == "target_date" and isinstance(val, str) and val:
+            val = date.fromisoformat(val)
         setattr(obj, field, val)
     db.commit()
     db.refresh(obj)

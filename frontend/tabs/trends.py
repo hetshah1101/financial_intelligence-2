@@ -122,8 +122,9 @@ def render_trends(dashboard: dict | None) -> None:
             ]
     else:
         if sel_cat:
+            all_months = [m["month"] for m in monthly]
             cat_periods, period_labels, amounts = aggregate_category_by_granularity(
-                all_cat_agg, granularity, sel_cat
+                all_cat_agg, granularity, sel_cat, all_months=all_months
             )
             y_primary = amounts
             acct_cat_data = aggregate_account_category_by_granularity(
@@ -157,12 +158,12 @@ def render_trends(dashboard: dict | None) -> None:
 
     # ── Trend insights + KPIs (above chart) ───────────────────────────────────
     _render_trend_insights(y_primary, period_labels, metric, mode, sel_cat)
-    _render_trend_kpis(y_primary, metric)
+    _render_trend_kpis(y_primary, metric, mode)
 
     # ── Chart ─────────────────────────────────────────────────────────────────
     fig = make_trends_chart(
         [], period_labels, traces,
-        is_percentage=(metric == "savings_rate"),
+        is_percentage=(metric == "savings_rate" and mode == "system"),
     )
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
@@ -200,9 +201,10 @@ def _render_trend_insights(
         f"{abs(overall_pct):.1f}%</span>"
         if overall_pct != 0 else ""
     )
-    peak_fmt   = fmt_inr(max(values), compact=True)
-    trough_fmt = fmt_inr(min(values), compact=True)
-    avg_fmt    = fmt_inr(avg_val, compact=True)
+    _is_pct = metric == "savings_rate" and mode == "system"
+    peak_fmt   = f"{max(values):.1f}%"   if _is_pct else fmt_inr(max(values), compact=True)
+    trough_fmt = f"{min(values):.1f}%"   if _is_pct else fmt_inr(min(values), compact=True)
+    avg_fmt    = f"{avg_val:.1f}%"        if _is_pct else fmt_inr(avg_val, compact=True)
 
     card = (
         f"<div style=\"background:{COLORS['bg_card']};border:1px solid {COLORS['border']};"
@@ -226,7 +228,7 @@ def _render_trend_insights(
     st.markdown(card, unsafe_allow_html=True)
 
 
-def _render_trend_kpis(values: list, metric: str) -> None:
+def _render_trend_kpis(values: list, metric: str, mode: str = "system") -> None:
     if len(values) < 2:
         return
 
@@ -256,8 +258,9 @@ def _render_trend_kpis(values: list, metric: str) -> None:
             unsafe_allow_html=True,
         )
 
+    is_pct = metric == "savings_rate" and mode == "system"
     arrow = "↑" if overall_pct > 0 else "↓" if overall_pct < 0 else "→"
     chip(col1, "Overall Trend",  f"{arrow} {abs(overall_pct):.1f}%", trend_color)
-    chip(col2, "Period Average", fmt_inr(avg_val, compact=True))
-    chip(col3, "Peak",           fmt_inr(max(values), compact=True))
+    chip(col2, "Period Average", f"{avg_val:.1f}%" if is_pct else fmt_inr(avg_val, compact=True))
+    chip(col3, "Peak",           f"{max(values):.1f}%" if is_pct else fmt_inr(max(values), compact=True))
     chip(col4, "Volatility",     vol_label, vol_color)

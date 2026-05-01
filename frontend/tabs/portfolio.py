@@ -74,7 +74,62 @@ def _render_crypto_form() -> None:
                 st.error(resp.text)
 
 
-def render_portfolio() -> None:
+def _render_liquid_cash_card(dashboard: dict | None) -> None:
+    if not dashboard:
+        return
+    monthly = dashboard.get("monthly_aggregates", [])
+    if not monthly:
+        return
+
+    liquid_cash = sum(m.get("net_savings", 0) for m in monthly)
+    total_income = sum(m.get("total_income", 0) for m in monthly)
+    total_expense = sum(m.get("total_expense", 0) for m in monthly)
+    total_investment = sum(m.get("total_investment", 0) for m in monthly)
+    color = COLORS["green"] if liquid_cash >= 0 else COLORS["red"]
+    sign = "+" if liquid_cash >= 0 else ""
+
+    st.markdown(f"""
+    <div style="background:{COLORS['bg_card']};border:1px solid {COLORS['border']};
+                border-left:4px solid {color};border-radius:12px;
+                padding:20px 24px;margin-bottom:20px">
+      <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+                  color:{COLORS['text_tertiary']};margin-bottom:10px">Liquid Cash (as of today)</div>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <div style="font-size:32px;color:{color};font-family:'DM Mono',monospace;font-weight:600">
+          {sign}{fmt_inr(liquid_cash)}
+        </div>
+        <div style="font-size:13px;color:{COLORS['text_secondary']}">
+          cumulative net savings across all months
+        </div>
+      </div>
+      <div style="display:flex;gap:28px;margin-top:14px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10px;color:{COLORS['text_tertiary']};text-transform:uppercase;
+                      letter-spacing:.08em;margin-bottom:2px">Total Income</div>
+          <div style="font-size:14px;color:{COLORS['green']};font-family:'DM Mono',monospace">
+            {fmt_inr(total_income)}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:{COLORS['text_tertiary']};text-transform:uppercase;
+                      letter-spacing:.08em;margin-bottom:2px">Total Expenses</div>
+          <div style="font-size:14px;color:{COLORS['red']};font-family:'DM Mono',monospace">
+            {fmt_inr(total_expense)}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:{COLORS['text_tertiary']};text-transform:uppercase;
+                      letter-spacing:.08em;margin-bottom:2px">Total Invested</div>
+          <div style="font-size:14px;color:{COLORS['blue']};font-family:'DM Mono',monospace">
+            {fmt_inr(total_investment)}
+          </div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_portfolio(dashboard: dict | None = None) -> None:
     st.markdown(f"""
     <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;
                 color:{COLORS['text_secondary']};margin-bottom:20px">
@@ -82,22 +137,28 @@ def render_portfolio() -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    _render_upload_section()
-    _render_crypto_form()
+    liquid_cash = 0
+    if dashboard:
+        monthly = dashboard.get("monthly_aggregates", [])
+        liquid_cash = sum(m.get("net_savings", 0) for m in monthly)
+
+    _render_liquid_cash_card(dashboard)
 
     data = _api("/portfolio/latest")
     if not data or not data.get("holdings"):
         _empty_state()
-        return
+    else:
+        summary = data["summary"]
+        holdings = data["holdings"]
+        snap_date = data.get("snapshot_date", "")
 
-    summary = data["summary"]
-    holdings = data["holdings"]
-    snap_date = data.get("snapshot_date", "")
+        _render_net_worth_header(summary)
+        _render_allocation_donut(summary, liquid_cash)
+        _render_holdings_table(holdings, snap_date)
+        _render_sip_tracker(holdings)
 
-    _render_net_worth_header(summary)
-    _render_allocation_donut(summary)
-    _render_holdings_table(holdings, snap_date)
-    _render_sip_tracker(holdings)
+    _render_upload_section()
+    _render_crypto_form()
 
 
 def _render_net_worth_header(summary: dict) -> None:
@@ -135,13 +196,18 @@ def _render_net_worth_header(summary: dict) -> None:
     """, unsafe_allow_html=True)
 
 
-def _render_allocation_donut(summary: dict) -> None:
+def _render_allocation_donut(summary: dict, liquid_cash: float = 0) -> None:
     by_type = summary.get("by_instrument_type", {})
-    if not by_type:
+    if not by_type and liquid_cash <= 0:
         return
 
     labels = list(by_type.keys())
     values = [by_type[k] for k in labels]
+
+    if liquid_cash > 0:
+        labels.append("Cash")
+        values.append(liquid_cash)
+
     colors = COLORS["chart"]
 
     fig = go.Figure(go.Pie(
@@ -270,7 +336,7 @@ def _empty_state() -> None:
       <div style="font-size:32px;margin-bottom:12px">📂</div>
       <div style="font-size:15px;color:{COLORS['text_primary']};margin-bottom:8px">No portfolio data yet</div>
       <div style="font-size:13px;color:{COLORS['text_secondary']}">
-        Use the upload section above to import your holdings.
+        Use the upload section below to import your holdings.
       </div>
     </div>
     """, unsafe_allow_html=True)

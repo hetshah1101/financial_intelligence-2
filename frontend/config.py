@@ -103,6 +103,11 @@ GLOBAL_CSS = """
     background: #0d0d0d !important;
     border-right: 1px solid #1a1a1a;
   }
+
+  /* Hide Data tab from navbar (accessible via Overview link) */
+  .stTabs [data-baseweb="tab-list"] [data-baseweb="tab"]:nth-child(5) {
+    display: none !important;
+  }
 </style>
 """
 
@@ -150,7 +155,7 @@ CATEGORY_CLASSIFICATION: dict = {
     "Gym":            "discretionary",
     "Sports":         "discretionary",
     "Social Life":    "discretionary",
-    "Family":         "discretionary",
+    "Family":         "essential",
     "Gifts":          "discretionary",
     "Subscriptions":  "discretionary",
     "Other":          "discretionary",
