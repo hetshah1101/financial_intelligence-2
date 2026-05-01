@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from database import engine
 from models import Transaction, YearlyAggregate
 
 
@@ -9,7 +10,7 @@ def compute_yearly_aggregates(db: Session, years: list[int] | None = None) -> No
     if years:
         query = query.filter(Transaction.year.in_(years))
 
-    df = pd.read_sql(query.statement, db.bind)
+    df = pd.read_sql(query.statement, engine)
     if df.empty:
         return
 

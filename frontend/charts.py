@@ -291,6 +291,7 @@ def make_trends_chart(
     periods: list,
     period_labels: list,
     traces: list,
+    is_percentage: bool = False,
 ) -> go.Figure:
     """
     Generic multi-line trend chart.
@@ -298,12 +299,25 @@ def make_trends_chart(
     """
     fig = go.Figure()
     for t in traces:
+        fmt = "%{y:.1f}%" if is_percentage else "₹%{y:,.0f}"
         fig.add_trace(go.Scatter(
             x=period_labels,
             y=t["y"],
             name=t["name"],
             line=dict(color=t["color"], width=2),
-            hovertemplate=f"<b>%{{x}}</b><br>{t['name']}: ₹%{{y:,.0f}}<extra></extra>",
+            hovertemplate=f"<b>%{{x}}</b><br>{t['name']}: {fmt}<extra></extra>",
         ))
-    fig.update_layout(**base_layout(height=320))
+    layout_overrides = {"height": 320}
+    if is_percentage:
+        layout_overrides["yaxis"] = dict(
+            gridcolor=COLORS["border_subtle"],
+            linecolor="rgba(0,0,0,0)",
+            tickcolor=COLORS["border"],
+            tickfont=dict(size=11, family="DM Mono, monospace", color=COLORS["text_secondary"]),
+            showgrid=True,
+            zeroline=False,
+            ticksuffix="%",
+            tickprefix="",
+        )
+    fig.update_layout(**base_layout(**layout_overrides))
     return fig

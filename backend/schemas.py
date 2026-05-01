@@ -147,3 +147,142 @@ class UploadResponse(BaseModel):
     rows_inserted: int
     rows_skipped: int
     message: str
+
+
+# ── Investment / Portfolio Schemas ─────────────────────────────────────────────
+
+class InvestmentSchema(BaseModel):
+    id: int
+    date: str
+    month: str
+    instrument_type: str
+    name: str
+    symbol: Optional[str] = None
+    isin: Optional[str] = None
+    folio_number: Optional[str] = None
+    units: Optional[float] = None
+    price_per_unit: Optional[float] = None
+    amount: float
+    transaction_type: Optional[str] = None
+    account: Optional[str] = None
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class HoldingSchema(BaseModel):
+    id: int
+    snapshot_date: str
+    instrument_type: str
+    name: str
+    symbol: Optional[str] = None
+    isin: Optional[str] = None
+    folio_number: Optional[str] = None
+    units: Optional[float] = None
+    avg_cost_per_unit: Optional[float] = None
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
+    invested_value: Optional[float] = None
+    unrealised_pnl: Optional[float] = None
+    unrealised_pnl_pct: Optional[float] = None
+    account: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class LiabilitySchema(BaseModel):
+    id: int
+    name: str
+    liability_type: Optional[str] = None
+    principal: Optional[float] = None
+    outstanding: float
+    interest_rate: Optional[float] = None
+    emi_amount: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    account: Optional[str] = None
+    as_of_date: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class LiabilityCreate(BaseModel):
+    name: str
+    liability_type: Optional[str] = None
+    principal: Optional[float] = None
+    outstanding: float
+    interest_rate: Optional[float] = None
+    emi_amount: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    account: Optional[str] = None
+    as_of_date: Optional[str] = None
+
+
+class GoalSchema(BaseModel):
+    id: int
+    name: str
+    target_amount: float
+    target_date: Optional[str] = None
+    current_amount: float
+    monthly_sip: float
+    linked_isin: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class GoalCreate(BaseModel):
+    name: str
+    target_amount: float
+    target_date: Optional[str] = None
+    current_amount: float = 0
+    monthly_sip: float = 0
+    linked_isin: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class GoalUpdate(BaseModel):
+    target_amount: Optional[float] = None
+    target_date: Optional[str] = None
+    current_amount: Optional[float] = None
+    monthly_sip: Optional[float] = None
+    linked_isin: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PortfolioSummary(BaseModel):
+    snapshot_date: str
+    total_current_value: float
+    total_invested_value: float
+    total_unrealised_pnl: float
+    total_unrealised_pnl_pct: float
+    by_instrument_type: dict
+
+
+class NetWorthSummary(BaseModel):
+    as_of_date: str
+    total_assets: float
+    total_liabilities: float
+    net_worth: float
+    asset_breakdown: dict
+    liability_breakdown: dict
+
+
+class CategoryTagOverrideSchema(BaseModel):
+    category: str
+    tag: str
+
+    model_config = {"from_attributes": True}
+
+
+class GoalSimulation(BaseModel):
+    goal_name: str
+    target_amount: float
+    current_amount: float
+    monthly_sip: float
+    months_to_goal: Optional[int] = None
+    projected_date: Optional[str] = None
+    shortfall: float
+    on_track: bool

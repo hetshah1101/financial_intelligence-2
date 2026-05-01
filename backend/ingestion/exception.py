@@ -11,7 +11,8 @@ Current rules
 
    Detection (any one of):
    a) Category name matches known card-payment phrases
-   b) Description matches card-payment regex patterns
+   b) Description matches card-payment regex patterns (requires payment context,
+      not bare issuer name, to avoid false positives on real purchases)
    c) Account = "Card" AND Type = "investment" — this catches the dedup-surviving
       side of paired bank→card transfers (Transfer-In to card account), which have
       Category="Bank Accounts" and would otherwise be missed by (a).
@@ -47,25 +48,18 @@ _CARD_ACCOUNTS: set[str] = {
     "slice",
 }
 
-# Regex patterns matched against the description field (case-insensitive)
+# Regex patterns matched against the description field (case-insensitive).
+# Each pattern requires explicit payment/settlement context so bare issuer names
+# (e.g. "Amex travel portal", "Bajaj Finance EMI") are not mis-reclassified.
 _CARD_DESC_PATTERNS: list[str] = [
-    r"credit\s*card",
-    r"card\s*payment",
-    r"card\s*settlement",
-    r"\bcc\s*payment\b",
-    r"hdfc\s*credit",
-    r"sbi\s*card",
-    r"axis\s*credit",
-    r"icici\s*credit",
-    r"kotak\s*credit",
-    r"indusind\s*credit",
-    r"\bcitibank\b",
-    r"\bamex\b",
-    r"american\s*express",
-    r"bajaj\s*(?:fin|card)",
-    r"one\s*card",
-    r"slice\s*card",
-    r"uni\s*card",
+    r"credit\s*card\s*(?:payment|bill|settlement|due|repayment)",
+    r"card\s*(?:payment|settlement|bill|due|repayment)",
+    r"\bcc\s*(?:payment|bill|settlement|due)\b",
+    r"(?:payment|repayment|bill\s*pay)\s+(?:to\s+)?(?:hdfc|sbi|axis|icici|kotak|indusind)\s*(?:credit|card)",
+    r"payment\s+to\s+(?:amex|american\s*express)",
+    r"payment\s+to\s+(?:one\s*card|onecard)",
+    r"payment\s+to\s+(?:slice|uni\s*card)",
+    r"payment\s+to\s+bajaj\s*(?:fin|card|finserv)",
 ]
 
 _CARD_PATTERN = re.compile("|".join(_CARD_DESC_PATTERNS), re.IGNORECASE)

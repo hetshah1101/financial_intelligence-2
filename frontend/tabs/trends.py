@@ -13,16 +13,18 @@ from formatters import fmt_inr
 
 
 METRIC_OPTIONS = {
-    "Expenses":    "total_expense",
-    "Income":      "total_income",
-    "Savings":     "net_savings",
-    "Investments": "total_investment",
+    "Expenses":       "total_expense",
+    "Income":         "total_income",
+    "Savings":        "net_savings",
+    "Savings Rate %": "savings_rate",
+    "Investments":    "total_investment",
 }
 
 METRIC_COLORS = {
     "total_expense":    COLORS["red"],
     "total_income":     COLORS["green"],
     "net_savings":      COLORS["purple"],
+    "savings_rate":     COLORS["amber"],
     "total_investment": COLORS["blue"],
 }
 
@@ -158,7 +160,10 @@ def render_trends(dashboard: dict | None) -> None:
     _render_trend_kpis(y_primary, metric)
 
     # ── Chart ─────────────────────────────────────────────────────────────────
-    fig = make_trends_chart([], period_labels, traces)
+    fig = make_trends_chart(
+        [], period_labels, traces,
+        is_percentage=(metric == "savings_rate"),
+    )
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 

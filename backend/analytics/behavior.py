@@ -12,9 +12,11 @@ def compute_spending_behavior(category_df: pd.DataFrame) -> SpendingBehavior:
             uncategorized_pct=0.0,
         )
 
-    # Aggregate across all months
+    # Use only the latest month so percentages reflect current, not lifetime, spending
+    latest_month = category_df["month"].max()
     by_cat = (
-        category_df.groupby(["category", "tag"])["total_amount"]
+        category_df[category_df["month"] == latest_month]
+        .groupby(["category", "tag"])["total_amount"]
         .sum()
         .reset_index()
         .sort_values("total_amount", ascending=False)

@@ -76,30 +76,47 @@ def generate_takeaways(latest: dict, baseline: dict | None, categories: list) ->
 
 
 def classify_anomalies(dashboard: dict) -> list:
-    raw = (
-        dashboard.get("anomalies_category", [])
-        + dashboard.get("anomalies_total_spend", [])
-        + dashboard.get("anomalies_erratic", [])
-    )
-    seen = set()
+    import re as _re
+    seen: set = set()
     result = []
-    for a in raw:
+
+    def _add(a: dict, multiplier: float) -> None:
         key = (a.get("month", ""), a.get("category", ""))
         if key in seen:
-            continue
+            return
         seen.add(key)
         amount    = a.get("amount", 0) or 0
-        threshold = a.get("threshold", 0) or 0
-        ratio     = (amount / threshold) if threshold > 0 else 0
+        threshold = a.get("threshold") or 0
+        reason    = a.get("reason", "")
+
+        if threshold and multiplier > 0:
+            # threshold = rolling_avg * multiplier  →  baseline = threshold / multiplier
+            baseline = round(threshold / multiplier, 2)
+        elif "last month" in reason:
+            # Erratic spike reason: "Spike: X is Y× last month (Z)"
+            m = _re.search(r'\((\d+(?:\.\d+)?)\)', reason)
+            baseline = float(m.group(1)) if m else 0.0
+        else:
+            baseline = 0.0
+
+        ratio = round(amount / baseline, 4) if baseline > 0 else 0.0
         result.append({
             "category":             a.get("category", "Unknown"),
             "current_month_amount": amount,
-            "three_month_avg":      threshold,
+            "three_month_avg":      baseline,
             "ratio":                ratio,
             "month":                a.get("month", ""),
-            "reason":               a.get("reason", ""),
+            "reason":               reason,
             "alert_type":           "spike" if ratio > 1.4 else "variance",
         })
+
+    for a in dashboard.get("anomalies_total_spend", []):
+        _add(a, 1.4)
+    for a in dashboard.get("anomalies_category", []):
+        _add(a, 1.5)
+    for a in dashboard.get("anomalies_erratic", []):
+        _add(a, 0)
+
     monthly = dashboard.get("monthly_aggregates", [])
     if len(monthly) >= 4:
         history = monthly[-4:-1]
@@ -110,7 +127,7 @@ def classify_anomalies(dashboard: dict) -> list:
                 "category":             "Savings",
                 "current_month_amount": cur_sav,
                 "three_month_avg":      avg_sav,
-                "ratio":                cur_sav / avg_sav,
+                "ratio":                round(cur_sav / avg_sav, 4),
                 "month":                monthly[-1].get("month", ""),
                 "reason":               "Savings dropped >20% below 3-month average",
                 "alert_type":           "savings",

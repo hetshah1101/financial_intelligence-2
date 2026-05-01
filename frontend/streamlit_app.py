@@ -14,6 +14,9 @@ from tabs.compare import render_compare
 from tabs.data import render_data
 from tabs.overview import render_overview
 from tabs.trends import render_trends
+from tabs.portfolio import render_portfolio
+from tabs.networth import render_networth
+from tabs.loans import render_loans
 
 st.set_page_config(page_title="Finsight", page_icon="₹", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -53,9 +56,16 @@ if dashboard is None:
         </div>
         """, unsafe_allow_html=True)
 
-tabs = st.tabs(["▣  Overview", "⟺  Compare", "↗  Trends", "⚠  Alerts", "⊞  Data"])
+tabs = st.tabs([
+    "▣  Overview", "⟺  Compare", "↗  Trends",
+    "⚠  Alerts", "⊞  Data",
+    "◈  Portfolio", "⬡  Net Worth", "₿  Loans",
+])
 with tabs[0]: render_overview(dashboard)
 with tabs[1]: render_compare(dashboard)
 with tabs[2]: render_trends(dashboard)
 with tabs[3]: render_alerts(dashboard)
 with tabs[4]: render_data()
+with tabs[5]: render_portfolio()
+with tabs[6]: render_networth()
+with tabs[7]: render_loans()

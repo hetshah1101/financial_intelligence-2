@@ -2,13 +2,15 @@ import pandas as pd
 from schemas import BudgetBaseline
 
 
-def compute_budget_baseline(category_df: pd.DataFrame) -> list[BudgetBaseline]:
+def compute_budget_baseline(
+    category_df: pd.DataFrame, window_months: int = 6
+) -> list[BudgetBaseline]:
     if category_df.empty:
         return []
 
     months_sorted = sorted(category_df["month"].unique())
-    last_3 = months_sorted[-3:] if len(months_sorted) >= 3 else months_sorted
-    recent = category_df[category_df["month"].isin(last_3)]
+    window = months_sorted[-window_months:] if len(months_sorted) >= window_months else months_sorted
+    recent = category_df[category_df["month"].isin(window)]
 
     baseline = (
         recent.groupby(["category", "tag"])["total_amount"]

@@ -1,17 +1,32 @@
+import time
 import requests
 import streamlit as st
 
 from config import API_BASE
 
+_DASHBOARD_TTL = 60
 
-@st.cache_data(ttl=60)
+
 def api_dashboard() -> dict | None:
+    """Fetch dashboard data with a 60s session cache that does not cache failures.
+
+    Unlike @st.cache_data, a failed fetch returns the last successful response (stale
+    data) rather than None — so a momentary backend restart doesn't blank the UI.
+    """
+    now = time.time()
+    cached = st.session_state.get("_dashboard_cache")
+    ts = st.session_state.get("_dashboard_ts", 0)
+    if cached is not None and now - ts < _DASHBOARD_TTL:
+        return cached
     try:
         r = requests.get(f"{API_BASE}/dashboard", timeout=8)
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+        st.session_state["_dashboard_cache"] = data
+        st.session_state["_dashboard_ts"] = now
+        return data
     except Exception:
-        return None
+        return cached  # serve stale data if available, None if first ever call failed
 
 
 @st.cache_data(ttl=60)

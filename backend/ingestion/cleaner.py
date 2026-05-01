@@ -1,4 +1,32 @@
+import logging
 import pandas as pd
+
+logger = logging.getLogger("finsight.ingestion.cleaner")
+
+_CANONICAL_TYPES = {"expense", "income", "investment"}
+
+_TYPE_MAP = {
+    "expense":      "expense",
+    "expenses":     "expense",
+    "exp.":         "expense",
+    "exp":          "expense",
+    "debit":        "expense",
+    "dr":           "expense",
+    "withdrawal":   "expense",
+    "withdraw":     "expense",
+    "income":       "income",
+    "credit":       "income",
+    "cr":           "income",
+    "deposit":      "income",
+    "investment":   "investment",
+    "invest":       "investment",
+    "transfer":     "investment",
+    "transfer-in":  "investment",
+    "transfer-out": "investment",
+    "transfer in":  "investment",
+    "transfer out": "investment",
+    "sip":          "investment",
+}
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
@@ -14,22 +42,18 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df["Amount (INR)"] = pd.to_numeric(df["Amount (INR)"], errors="coerce").abs()
 
     # Type → lowercase strip; normalize variations
-    type_map = {
-        "exp.": "expense",
-        "expense": "expense",
-        "income": "income",
-        "transfer-in": "investment",
-        "transfer-out": "investment",
-        "transfer": "investment",
-        "investment": "investment",
-    }
     df["Type"] = (
         df["Type"]
         .astype(str)
         .str.strip()
         .str.lower()
-        .map(lambda x: type_map.get(x, x))  # Use map, fallback to original
+        .map(lambda x: _TYPE_MAP.get(x, x))
     )
+
+    # Warn about any rows whose type didn't resolve to a canonical value
+    unresolved = df[~df["Type"].isin(_CANONICAL_TYPES)]["Type"].unique()
+    for raw_type in unresolved:
+        logger.warning("Unrecognized transaction type %r — row will be stored as-is and excluded from analytics", raw_type)
 
     # Fill missing fields
     df["Category"] = df["Category"].fillna("uncategorized").astype(str).str.strip()
@@ -44,7 +68,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         "transaction description", "transaction narration",
     }
     _desc_col = next((c for c in df.columns if c.strip().lower() in _desc_candidates), None)
-    print(f"[DEBUG cleaner] columns={df.columns.tolist()} desc_col={_desc_col!r}")
+    logger.debug("columns=%s  desc_col=%r", df.columns.tolist(), _desc_col)
     if _desc_col:
         df["description"] = df[_desc_col].fillna("").astype(str).str.strip()
     else:
@@ -57,7 +81,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     # Drop rows where amount is NaN after coercion
     df = df.dropna(subset=["Amount (INR)"])
 
-    # Remove duplicates by (date, amount, description)
-    df = df.drop_duplicates(subset=["Date", "Amount (INR)", "description"])
+    # Remove duplicates by (date, amount, description, account)
+    df = df.drop_duplicates(subset=["Date", "Amount (INR)", "description", "Account"])
 
     return df

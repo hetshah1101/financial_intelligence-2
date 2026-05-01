@@ -37,6 +37,7 @@ def run_pipeline(df: pd.DataFrame, db: Session) -> dict:
                 Transaction.date == row["Date"],
                 Transaction.amount == row["Amount (INR)"],
                 Transaction.description == row["description"],
+                Transaction.account == row["Account"],
             )
             .first()
         )

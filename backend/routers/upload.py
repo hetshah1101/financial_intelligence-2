@@ -1,13 +1,17 @@
 import io
+import logging
 import pandas as pd
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
 from ingestion.pipeline import run_pipeline
 from analytics.engine import recompute_aggregates
+from routers.dashboard import invalidate_dashboard_cache
 from models import Transaction, MonthlyAggregate, CategoryAggregate, YearlyAggregate
 from schemas import UploadResponse
+
+logger = logging.getLogger("finsight.upload")
 
 router = APIRouter()
 
@@ -35,31 +39,45 @@ def reset_all(db: Session = Depends(get_db)):
     return {"status": "ok", "message": "All tables truncated."}
 
 
+def _bg_recompute(months: list[str] | None = None) -> None:
+    """Run aggregate recompute in background and bust the dashboard cache."""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        recompute_aggregates(db, months=months)
+        invalidate_dashboard_cache()
+        logger.info("Aggregate recompute complete (months=%s)", months)
+    finally:
+        db.close()
+
+
 @router.post("/upload", response_model=UploadResponse)
-async def upload_initial(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_initial(
+    file: UploadFile = File(...),
+    bg: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db),
+):
     try:
         df = _read_upload(file)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
 
-    print(f"[DEBUG] File read: {df.shape[0]} rows, columns: {df.columns.tolist()}")
+    logger.info("File read: %d rows, columns: %s", df.shape[0], df.columns.tolist())
 
     try:
         result = run_pipeline(df, db)
-        print(f"[DEBUG] Pipeline result: inserted={result['inserted']}, skipped={result['skipped']}")
+        logger.info("Pipeline: inserted=%d skipped=%d", result["inserted"], result["skipped"])
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        print(f"[DEBUG] Unexpected error in pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unexpected error in pipeline")
         raise HTTPException(status_code=500, detail=str(e))
 
     if result["inserted"] > 0:
-        recompute_aggregates(db)
+        bg.add_task(_bg_recompute)
 
     return UploadResponse(
-        status="success",
+        status="processing" if result["inserted"] > 0 else "success",
         rows_inserted=result["inserted"],
         rows_skipped=result["skipped"],
         message=f"Inserted {result['inserted']} transactions, skipped {result['skipped']} duplicates.",
@@ -67,7 +85,11 @@ async def upload_initial(file: UploadFile = File(...), db: Session = Depends(get
 
 
 @router.post("/update", response_model=UploadResponse)
-async def upload_incremental(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_incremental(
+    file: UploadFile = File(...),
+    bg: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db),
+):
     try:
         df = _read_upload(file)
     except Exception as e:
@@ -80,11 +102,10 @@ async def upload_incremental(file: UploadFile = File(...), db: Session = Depends
 
     affected = result["affected_months"]
     if affected:
-        # Incremental recompute: only affected months + their year
-        recompute_aggregates(db, months=affected)
+        bg.add_task(_bg_recompute, affected)
 
     return UploadResponse(
-        status="success",
+        status="processing" if affected else "success",
         rows_inserted=result["inserted"],
         rows_skipped=result["skipped"],
         message=f"Inserted {result['inserted']} new transactions, skipped {result['skipped']} duplicates.",

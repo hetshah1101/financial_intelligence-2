@@ -24,4 +24,5 @@ def get_db():
 
 def init_db():
     from models import Transaction, MonthlyAggregate, CategoryAggregate, YearlyAggregate  # noqa: F401
+    import models_investment  # noqa: F401  — registers Investment, Holding, Liability, Goal, CategoryTagOverride
     Base.metadata.create_all(bind=engine)

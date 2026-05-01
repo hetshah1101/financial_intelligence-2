@@ -1,8 +1,15 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from routers import upload, dashboard
+from routers import portfolio
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
 
 app = FastAPI(
     title="Personal Financial Analytics API",
@@ -19,6 +26,7 @@ app.add_middleware(
 
 app.include_router(upload.router, tags=["Ingestion"])
 app.include_router(dashboard.router, tags=["Analytics"])
+app.include_router(portfolio.router, tags=["Portfolio"])
 
 
 @app.on_event("startup")

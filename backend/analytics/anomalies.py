@@ -10,7 +10,8 @@ ERRATIC_STD_MULTIPLIER = 1.5      # mean + N*std as threshold
 
 def detect_total_spend_anomalies(monthly_df: pd.DataFrame) -> list[AnomalyRecord]:
     df = monthly_df.sort_values("month").copy()
-    df["rolling_3m_avg"] = df["total_expense"].shift(1).rolling(3, min_periods=1).mean()
+    # min_periods=2 so a single prior month isn't treated as a stable baseline
+    df["rolling_3m_avg"] = df["total_expense"].shift(1).rolling(3, min_periods=2).mean()
 
     anomalies = []
     for _, row in df.iterrows():
@@ -33,7 +34,7 @@ def detect_category_anomalies(category_df: pd.DataFrame) -> list[AnomalyRecord]:
 
     for category, grp in df.groupby("category"):
         grp = grp.sort_values("month").copy()
-        grp["rolling_3m_avg"] = grp["total_amount"].shift(1).rolling(3, min_periods=1).mean()
+        grp["rolling_3m_avg"] = grp["total_amount"].shift(1).rolling(3, min_periods=2).mean()
 
         for _, row in grp.iterrows():
             if pd.isna(row["rolling_3m_avg"]) or row["rolling_3m_avg"] == 0:
@@ -96,11 +97,11 @@ def detect_erratic_spend(category_df: pd.DataFrame) -> list[AnomalyRecord]:
                 amount=round(float(amounts.iloc[0]), 2),
             ))
 
-    # Deduplicate by (month, category, reason prefix)
+    # Deduplicate by (month, category, reason prefix) — 60 chars avoids prefix collisions
     seen: set[tuple] = set()
     unique = []
     for a in anomalies:
-        key = (a.month, a.category, a.reason[:30])
+        key = (a.month, a.category or "", a.reason[:60])
         if key not in seen:
             seen.add(key)
             unique.append(a)

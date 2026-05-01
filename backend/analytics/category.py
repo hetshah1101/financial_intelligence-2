@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from database import engine
 from models import Transaction, CategoryAggregate
 
 
@@ -9,7 +10,7 @@ def compute_category_aggregates(db: Session, months: list[str] | None = None) ->
     if months:
         query = query.filter(Transaction.month.in_(months))
 
-    df = pd.read_sql(query.statement, db.bind)
+    df = pd.read_sql(query.statement, engine)
     if df.empty:
         return
 

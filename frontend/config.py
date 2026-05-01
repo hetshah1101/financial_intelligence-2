@@ -164,13 +164,14 @@ CATEGORY_CLASSIFICATION: dict = {
 
 CATEGORY_DEFAULT_TYPE = "discretionary"
 
+# Prebuilt lowercase map avoids O(n) scan on every classify_category call
+_CATEGORY_LOWER_MAP: dict[str, str] = {k.lower(): v for k, v in CATEGORY_CLASSIFICATION.items()}
+
 
 def classify_category(category: str) -> str:
-    """Return 'essential' or 'discretionary'. Case-insensitive lookup."""
-    if category in CATEGORY_CLASSIFICATION:
-        return CATEGORY_CLASSIFICATION[category]
-    lower = category.lower()
-    for key, val in CATEGORY_CLASSIFICATION.items():
-        if key.lower() == lower:
-            return val
-    return CATEGORY_DEFAULT_TYPE
+    """Return 'essential' or 'discretionary'. Case-insensitive O(1) lookup."""
+    return (
+        CATEGORY_CLASSIFICATION.get(category)
+        or _CATEGORY_LOWER_MAP.get(category.lower())
+        or CATEGORY_DEFAULT_TYPE
+    )

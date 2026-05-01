@@ -18,7 +18,7 @@ class Transaction(Base):
     tag = Column(String(50), default="uncategorized")       # essential/discretionary/uncategorized
 
     __table_args__ = (
-        UniqueConstraint("date", "amount", "description", name="uq_transaction"),
+        UniqueConstraint("date", "amount", "description", "account", name="uq_transaction"),
     )
 
 
