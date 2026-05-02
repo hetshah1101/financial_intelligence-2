@@ -73,6 +73,17 @@ def api_reset() -> dict | None:
         return None
 
 
+@st.cache_data(ttl=30)
+def api_notes() -> dict:
+    """Return all month notes as {YYYY-MM: note_text}."""
+    try:
+        r = requests.get(f"{API_BASE}/notes", timeout=5)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {}
+
+
 def categories_for_month(dashboard: dict, month: str) -> list:
     """Filter category_aggregates for a specific month, sorted by amount desc."""
     return sorted(

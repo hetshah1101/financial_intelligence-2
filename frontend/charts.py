@@ -226,6 +226,7 @@ def make_category_bar(
     current_vals: list,
     baseline_vals: list,
     current_label: str,
+    baseline_label: str = "Baseline",
     account_cat_data: dict | None = None,
 ) -> go.Figure:
     """Grouped bar: current (stacked Bank+Card if data available) vs baseline per category."""
@@ -265,13 +266,13 @@ def make_category_bar(
         ))
 
     fig.add_trace(go.Bar(
-        name="Baseline",
+        name=baseline_label,
         x=categories,
         y=baseline_vals,
         marker_color=COLORS["border"],
         marker_line_width=0,
         offsetgroup="baseline",
-        hovertemplate="<b>%{x}</b><br>Baseline: ₹%{y:,.0f}<extra></extra>",
+        hovertemplate=f"<b>%{{x}}</b><br>{baseline_label}: ₹%{{y:,.0f}}<extra></extra>",
     ))
 
     if baseline_vals:
@@ -292,10 +293,14 @@ def make_trends_chart(
     period_labels: list,
     traces: list,
     is_percentage: bool = False,
+    reference_lines: list | None = None,
+    month_annotations: dict | None = None,
 ) -> go.Figure:
     """
     Generic multi-line trend chart.
     traces: list of dicts with keys: y, name, color
+    reference_lines: list of {value, label, color, dash}
+    month_annotations: dict of {period_label: note_text}
     """
     fig = go.Figure()
     for t in traces:
@@ -307,6 +312,39 @@ def make_trends_chart(
             line=dict(color=t["color"], width=2),
             hovertemplate=f"<b>%{{x}}</b><br>{t['name']}: {fmt}<extra></extra>",
         ))
+
+    if reference_lines:
+        for ref in reference_lines:
+            fig.add_hline(
+                y=ref["value"],
+                line_dash=ref.get("dash", "dot"),
+                line_color=ref.get("color", COLORS["border"]),
+                line_width=1,
+                opacity=0.6,
+                annotation_text=ref.get("label", ""),
+                annotation_position="right",
+                annotation_font=dict(size=10, color=COLORS["text_tertiary"]),
+            )
+
+    if month_annotations:
+        for label, note in month_annotations.items():
+            if label in period_labels and note:
+                fig.add_annotation(
+                    x=label,
+                    xref="x",
+                    y=1.04,
+                    yref="paper",
+                    text="📝",
+                    showarrow=False,
+                    font=dict(size=13),
+                    hovertext=note,
+                    hoverlabel=dict(
+                        bgcolor=COLORS["bg_elevated"],
+                        bordercolor=COLORS["border"],
+                        font=dict(size=11, color=COLORS["text_primary"]),
+                    ),
+                )
+
     layout_overrides = {"height": 320}
     if is_percentage:
         layout_overrides["yaxis"] = dict(

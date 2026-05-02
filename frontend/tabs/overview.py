@@ -285,7 +285,7 @@ def _render_category_breakdown(categories: list) -> None:
 
     with col_ess:
         ess_total = sum(a for _, a in essential)
-        with st.expander(f"Essential — {fmt_inr(ess_total, compact=True)}", expanded=False):
+        with st.expander(f"Essential — {fmt_inr(ess_total, compact=True)}", expanded=True):
             st.markdown(
                 f"<div style=\"padding:4px 0\">{_cat_rows(essential, COLORS['blue'])}</div>",
                 unsafe_allow_html=True,
@@ -293,7 +293,7 @@ def _render_category_breakdown(categories: list) -> None:
 
     with col_dis:
         dis_total = sum(a for _, a in discretionary)
-        with st.expander(f"Discretionary — {fmt_inr(dis_total, compact=True)}", expanded=False):
+        with st.expander(f"Discretionary — {fmt_inr(dis_total, compact=True)}", expanded=True):
             st.markdown(
                 f"<div style=\"padding:4px 0\">{_cat_rows(discretionary, COLORS['amber'])}</div>",
                 unsafe_allow_html=True,

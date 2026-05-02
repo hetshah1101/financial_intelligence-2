@@ -7,6 +7,7 @@ from analytics import (
     aggregate_account_category_by_granularity,
     fmt_period_label,
 )
+from api import api_notes
 from charts import make_trends_chart
 from config import COLORS
 from formatters import fmt_inr
@@ -160,10 +161,46 @@ def render_trends(dashboard: dict | None) -> None:
     _render_trend_insights(y_primary, period_labels, metric, mode, sel_cat)
     _render_trend_kpis(y_primary, metric, mode)
 
+    # ── Reference lines ────────────────────────────────────────────────────────
+    ref_lines = []
+    if mode == "system" and y_primary:
+        avg_val = sum(y_primary) / len(y_primary)
+        if metric == "savings_rate":
+            ref_lines.append({"value": 20, "label": "20% target",
+                               "color": COLORS["green"], "dash": "dot"})
+            if avg_val > 0:
+                ref_lines.append({"value": avg_val,
+                                   "label": f"Your avg {avg_val:.1f}%",
+                                   "color": COLORS["amber"], "dash": "dash"})
+        elif avg_val > 0:
+            ref_lines.append({"value": avg_val,
+                               "label": f"Avg {fmt_inr(avg_val, compact=True)}",
+                               "color": COLORS["amber"], "dash": "dash"})
+
+    # ── Month annotations from notes ───────────────────────────────────────────
+    notes = api_notes()
+    month_annotations: dict = {}
+    if notes:
+        if granularity == "monthly":
+            for month, note in notes.items():
+                lbl = fmt_period_label(month, granularity)
+                if lbl in period_labels and note:
+                    month_annotations[lbl] = note
+        else:
+            for m in monthly:
+                month = m["month"]
+                if month in notes and notes[month]:
+                    lbl = fmt_period_label(month, granularity)
+                    if lbl in period_labels:
+                        prev = month_annotations.get(lbl, "")
+                        month_annotations[lbl] = (prev + "; " + notes[month]).lstrip("; ")
+
     # ── Chart ─────────────────────────────────────────────────────────────────
     fig = make_trends_chart(
         [], period_labels, traces,
         is_percentage=(metric == "savings_rate" and mode == "system"),
+        reference_lines=ref_lines or None,
+        month_annotations=month_annotations or None,
     )
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 

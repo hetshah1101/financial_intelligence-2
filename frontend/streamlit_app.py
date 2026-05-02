@@ -17,6 +17,7 @@ from tabs.trends import render_trends
 from tabs.portfolio import render_portfolio
 from tabs.networth import render_networth
 from tabs.loans import render_loans
+from tabs.action_plan import render_action_plan
 
 st.set_page_config(page_title="Finsight", page_icon="₹", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -58,14 +59,15 @@ if dashboard is None:
 
 tabs = st.tabs([
     "▣  Overview", "⟺  Compare", "↗  Trends",
-    "⚠  Alerts", "⊞  Data",
+    "⚠  Alerts", "⊕  Action Plan", "⊞  Data",
     "◈  Portfolio", "⬡  Net Worth", "₿  Loans",
 ])
 with tabs[0]: render_overview(dashboard)
 with tabs[1]: render_compare(dashboard)
 with tabs[2]: render_trends(dashboard)
 with tabs[3]: render_alerts(dashboard)
-with tabs[4]: render_data()
-with tabs[5]: render_portfolio(dashboard)
-with tabs[6]: render_networth(dashboard)
-with tabs[7]: render_loans()
+with tabs[4]: render_action_plan(dashboard)
+with tabs[5]: render_data()
+with tabs[6]: render_portfolio(dashboard)
+with tabs[7]: render_networth(dashboard)
+with tabs[8]: render_loans()

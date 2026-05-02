@@ -105,7 +105,7 @@ GLOBAL_CSS = """
   }
 
   /* Hide Data tab from navbar (accessible via Overview link) */
-  .stTabs [data-baseweb="tab-list"] [data-baseweb="tab"]:nth-child(5) {
+  .stTabs [data-baseweb="tab-list"] [data-baseweb="tab"]:nth-child(6) {
     display: none !important;
   }
 </style>

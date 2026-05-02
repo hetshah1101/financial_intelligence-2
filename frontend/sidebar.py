@@ -1,7 +1,9 @@
+import requests as _req
 import streamlit as st
 
-from api import api_dashboard, api_upload
-from config import COLORS
+from api import api_dashboard, api_notes, api_upload
+from config import API_BASE, COLORS
+from formatters import fmt_month
 
 
 def render_sidebar() -> None:
@@ -51,6 +53,31 @@ def render_sidebar() -> None:
               API Offline
             </div>
             """, unsafe_allow_html=True)
+
+        # ── Month note editor ──────────────────────────────────────────────────
+        sel_month = st.session_state.get("overview_month")
+        if sel_month:
+            _divider()
+            notes = api_notes()
+            existing_note = notes.get(sel_month, "")
+            note_text = st.text_area(
+                f"Note — {fmt_month(sel_month)}",
+                value=existing_note,
+                placeholder="e.g. Goa trip, annual insurance, bonus month...",
+                key=f"note_{sel_month}",
+                height=80,
+            )
+            if st.button("Save note", key=f"save_note_{sel_month}"):
+                try:
+                    _req.post(
+                        f"{API_BASE}/notes",
+                        json={"month": sel_month, "note": note_text},
+                        timeout=5,
+                    )
+                    st.cache_data.clear()
+                    st.success("Saved.")
+                except Exception as e:
+                    st.error(f"Could not save: {e}")
 
 
 def _divider() -> None:

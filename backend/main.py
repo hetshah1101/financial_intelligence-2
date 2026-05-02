@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
 from routers import upload, dashboard
 from routers import portfolio
+from routers import notes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(upload.router, tags=["Ingestion"])
 app.include_router(dashboard.router, tags=["Analytics"])
 app.include_router(portfolio.router, tags=["Portfolio"])
+app.include_router(notes.router, tags=["Notes"])
 
 
 @app.on_event("startup")

@@ -56,23 +56,66 @@ def behavioral_split(categories: list) -> dict:
 
 
 def generate_takeaways(latest: dict, baseline: dict | None, categories: list) -> list:
-    tips = []
+    candidates = []  # (priority, message) — lower = shown first
+
+    # Expense vs baseline — only surface when delta is meaningful
     if baseline and baseline["total_expense"] > 0:
         delta = (latest["total_expense"] - baseline["total_expense"]) / baseline["total_expense"] * 100
-        direction = "above" if delta > 0 else "below"
-        if abs(delta) > 3:
-            tips.append(f"Expenses {abs(delta):.0f}% {direction} your 12-month average")
+        if abs(delta) > 5:
+            direction = "above" if delta > 0 else "below"
+            candidates.append((1, f"Expenses {abs(delta):.0f}% {direction} your 12-month average"))
+
+    # Category concentration
     if categories:
         top = categories[0]
         pct = top.get("percentage_of_total_expense") or top.get("percentage_of_total", 0)
-        tips.append(f"{top['category']} is your largest expense at {pct:.0f}% of spending")
+        if pct >= 40:
+            candidates.append((1, f"{top['category']} dominates at {pct:.0f}% of all spending"))
+        elif pct >= 25:
+            candidates.append((3, f"{top['category']} is your largest category at {pct:.0f}%"))
+
+    # Savings rate — calibrated messaging
     rate = latest.get("savings_rate", 0)
-    status = "on track" if rate >= 20 else "below recommended 20% threshold"
-    tips.append(f"Savings rate {rate:.0f}% this month — {status}")
+    if baseline:
+        baseline_rate = baseline.get("savings_rate", 0)
+        rate_delta = rate - baseline_rate
+        if rate >= 30:
+            candidates.append((2, f"Strong month — {rate:.0f}% savings rate, {rate_delta:+.0f}pp vs your average"))
+        elif rate >= 20:
+            candidates.append((3, f"Savings rate {rate:.0f}% — on track ({rate_delta:+.0f}pp vs average)"))
+        elif rate < 10:
+            candidates.append((1, f"Savings rate {rate:.0f}% — review discretionary spend"))
+        else:
+            candidates.append((2, f"Savings rate {rate:.0f}% — {20 - rate:.0f}pp below 20% threshold"))
+    else:
+        if rate >= 20:
+            candidates.append((3, f"Savings rate {rate:.0f}% — on track"))
+        else:
+            candidates.append((2, f"Savings rate {rate:.0f}% — below 20% target"))
+
+    # Investments — flag if zero or notably high
     inv = latest.get("total_investment", 0)
-    if inv > 0:
-        tips.append(f"₹{inv / 1000:.0f}K invested this month")
-    return tips[:4]
+    income = latest.get("total_income", 0)
+    if inv == 0 and income > 0:
+        candidates.append((2, "No investments recorded this month"))
+    elif inv > 0 and income > 0:
+        inv_rate = inv / income * 100
+        if inv_rate >= 25:
+            candidates.append((2, f"₹{inv/1000:.0f}K invested — {inv_rate:.0f}% of income going to investments"))
+        else:
+            candidates.append((4, f"₹{inv/1000:.0f}K invested this month"))
+
+    # Discretionary creep
+    if categories:
+        total_exp = sum(c["total_amount"] for c in categories) or 1
+        discr = sum(c["total_amount"] for c in categories
+                    if classify_category(c["category"]) == "discretionary")
+        discr_pct = discr / total_exp * 100
+        if discr_pct > 55:
+            candidates.append((2, f"Discretionary spending is {discr_pct:.0f}% of expenses this month"))
+
+    candidates.sort(key=lambda x: x[0])
+    return [msg for _, msg in candidates[:4]]
 
 
 def classify_anomalies(dashboard: dict) -> list:
@@ -120,16 +163,18 @@ def classify_anomalies(dashboard: dict) -> list:
     monthly = dashboard.get("monthly_aggregates", [])
     if len(monthly) >= 4:
         history = monthly[-4:-1]
-        avg_sav = mean(m["net_savings"] for m in history)
-        cur_sav = monthly[-1].get("net_savings", 0)
-        if avg_sav > 0 and cur_sav < avg_sav * 0.8:
+        avg_rate = mean(m["savings_rate"] for m in history)
+        cur_rate = monthly[-1].get("savings_rate", 0)
+        cur_sav  = monthly[-1].get("net_savings", 0)
+        avg_sav  = mean(m["net_savings"] for m in history)
+        if avg_rate > 5 and cur_rate < avg_rate * 0.8:
             result.append({
-                "category":             "Savings",
+                "category":             "Savings Rate",
                 "current_month_amount": cur_sav,
                 "three_month_avg":      avg_sav,
-                "ratio":                round(cur_sav / avg_sav, 4),
+                "ratio":                round(cur_rate / avg_rate, 4),
                 "month":                monthly[-1].get("month", ""),
-                "reason":               "Savings dropped >20% below 3-month average",
+                "reason":               f"Savings rate {cur_rate:.0f}% vs {avg_rate:.0f}% avg — dropped {avg_rate - cur_rate:.0f}pp",
                 "alert_type":           "savings",
             })
     return sorted(result, key=lambda x: x["ratio"], reverse=True)

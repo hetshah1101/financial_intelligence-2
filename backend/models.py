@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, Float, String, Date, UniqueConstraint
+from datetime import datetime
+from sqlalchemy import Column, Integer, Float, String, Date, DateTime, UniqueConstraint
 from database import Base
 
 
@@ -59,3 +60,11 @@ class YearlyAggregate(Base):
     total_investment = Column(Float, default=0.0)
     avg_monthly_expense = Column(Float, default=0.0)
     savings_rate = Column(Float, default=0.0)
+
+
+class MonthlyNote(Base):
+    __tablename__ = "monthly_notes"
+
+    month      = Column(String(7), primary_key=True)   # YYYY-MM
+    note       = Column(String(500), nullable=False, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

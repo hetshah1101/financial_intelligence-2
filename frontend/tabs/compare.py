@@ -85,6 +85,19 @@ def render_compare(dashboard: dict | None) -> None:
     baseline_cats = build_baseline_cats(all_cat_agg, baseline_months_set)
     baseline_agg = compute_baseline(monthly[:sel_idx + 1], baseline_type)
 
+    def _baseline_desc(bt: str, window: list) -> str:
+        if bt == "last_month" and window:
+            return f"vs {fmt_month(window[-1]['month'])}"
+        elif bt in ("recent_avg", "longterm_avg"):
+            return f"avg of last {len(window)} months"
+        elif bt == "12m_avg" and len(window) > 1:
+            return f"avg {fmt_month(window[0]['month'])}–{fmt_month(window[-1]['month'])}"
+        elif bt == "all_time":
+            return f"all-time avg ({len(window)} months)"
+        return "baseline"
+
+    baseline_desc = _baseline_desc(baseline_type, history_window)
+
     # ── Category diffs ────────────────────────────────────────────────────────
     cat_diffs = build_category_diffs(current_cats, baseline_cats)
 
@@ -124,7 +137,7 @@ def render_compare(dashboard: dict | None) -> None:
                 f"{fmt_inr(sel_month_data.get('total_expense', 0))}</div>"
                 f"<div style=\"font-size:12px;color:{d_color}\">"
                 f"{arrow} {abs(d_exp_pct):.1f}%"
-                f"<span style=\"color:{COLORS['text_tertiary']}\"> vs baseline</span>"
+                f"<span style=\"color:{COLORS['text_tertiary']}\"> {baseline_desc}</span>"
                 f"</div></div>",
                 unsafe_allow_html=True,
             )
@@ -191,6 +204,7 @@ def render_compare(dashboard: dict | None) -> None:
 
         fig = make_category_bar(
             cats, curr_vals, base_vals, fmt_month(selected_month),
+            baseline_label=baseline_desc,
             account_cat_data=account_cat_data if account_cat_data else None,
         )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
